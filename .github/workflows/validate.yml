@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clean remaining legacy files
-        run: python clean_remaining.py
+        run: python3 clean_remaining.py
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clean remaining legacy files
-        run: python clean_remaining.py
+        run: python3 clean_remaining.py
 
       - name: Check markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clean remaining legacy files
-        run: python clean_remaining.py
+        run: python3 clean_remaining.py
 
       - name: Run CSpell
         uses: streetsidesoftware/cspell-action@v5
@@ -69,49 +69,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clean remaining legacy files
-        run: python clean_remaining.py
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        run: python3 clean_remaining.py
 
       - name: Check YAML frontmatter on NES-2xx+ documents
-        run: |
-          python - <<'EOF'
-          import os
-          import sys
-
-          errors = []
-          required_fields = ['document_id', 'title', 'version', 'status', 'owner']
-
-          dirs_to_check = [
-            'engineering-system/05-backend',
-            'engineering-system/06-frontend',
-            'engineering-system/07-mobile',
-            'engineering-system/08-platform',
-            'engineering-system/09-ai',
-          ]
-
-          for d in dirs_to_check:
-            for fname in os.listdir(d):
-              if not fname.endswith('.md') or fname == '.gitkeep':
-                continue
-              fpath = os.path.join(d, fname)
-              with open(fpath, encoding='utf-8') as f:
-                content = f.read()
-              if not content.startswith('---'):
-                errors.append(f"MISSING FRONTMATTER: {fpath}")
-                continue
-              for field in required_fields:
-                if f'{field}:' not in content[:500]:
-                  errors.append(f"MISSING FIELD '{field}': {fpath}")
-
-          if errors:
-            print("Document validation errors:")
-            for e in errors:
-              print(f"  ✗ {e}")
-            sys.exit(1)
-          else:
-            print(f"✓ All documents validated successfully")
-          EOF
+        run: python3 validate_structure.py
