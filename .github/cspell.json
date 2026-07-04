@@ -8,6 +8,9 @@
     "**/*.md",
     "__pycache__/**",
     "**/*.pyc",
-    ".github/CODEOWNERS"
+    ".github/CODEOWNERS",
+    ".gitignore",
+    "cspell.json",
+    ".github/cspell.json"
   ]
 }
