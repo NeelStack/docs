@@ -1,6 +1,9 @@
 {
   "ignorePatterns": [
     {
+      "pattern": "^http"
+    },
+    {
       "pattern": "^file:"
     },
     {
