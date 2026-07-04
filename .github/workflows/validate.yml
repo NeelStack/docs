@@ -1,0 +1,106 @@
+name: Validate & Lint Documentation
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2
+
+      - name: Run markdownlint
+        run: markdownlint-cli2 "**/*.md" "#node_modules"
+
+  link-check:
+    name: Internal Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+          config-file: '.github/mlc_config.json'
+          folder-path: 'engineering-system, product-docs'
+
+  spell-check:
+    name: Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run CSpell
+        uses: streetsidesoftware/cspell-action@v5
+        with:
+          files: "**/*.md"
+          config: ".github/cspell.json"
+
+  validate-structure:
+    name: Validate Document Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check YAML frontmatter on NES-2xx+ documents
+        run: |
+          python - <<'EOF'
+          import os
+          import sys
+
+          errors = []
+          required_fields = ['document_id', 'title', 'version', 'status', 'owner']
+
+          dirs_to_check = [
+            'engineering-system/05-backend',
+            'engineering-system/06-frontend',
+            'engineering-system/07-mobile',
+            'engineering-system/08-platform',
+            'engineering-system/09-ai',
+          ]
+
+          for d in dirs_to_check:
+            for fname in os.listdir(d):
+              if not fname.endswith('.md') or fname == '.gitkeep':
+                continue
+              fpath = os.path.join(d, fname)
+              with open(fpath, encoding='utf-8') as f:
+                content = f.read()
+              if not content.startswith('---'):
+                errors.append(f"MISSING FRONTMATTER: {fpath}")
+                continue
+              for field in required_fields:
+                if f'{field}:' not in content[:500]:
+                  errors.append(f"MISSING FIELD '{field}': {fpath}")
+
+          if errors:
+            print("Document validation errors:")
+            for e in errors:
+              print(f"  ✗ {e}")
+            sys.exit(1)
+          else:
+            print(f"✓ All documents validated successfully")
+          EOF

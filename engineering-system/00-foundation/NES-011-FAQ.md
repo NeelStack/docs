@@ -13,7 +13,7 @@ review_cycle: Every 12 Months
 maturity: L5 (Gold Standard)
 document_type: Reference
 parent_document: NES-010 Glossary
-next_document: NAP-001 Architecture Principles
+next_document: NES-100 Architecture Principles
 ---
 
 # NeelStack Engineering FAQ

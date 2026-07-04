@@ -1,48 +1,98 @@
-# LAW-007: Security
+---
+document_id: LAW-007
+title: Security
+subtitle: Security is a first-class engineering requirement — not an afterthought
+version: 1.0.0
+status: L3 - Enterprise
+classification: Internal
+owner: Chief Security Architect
+review_cycle: Annual
+document_type: Engineering Law
+parent_document: LAW-006 Testing
+next_document: LAW-008 Performance
+---
 
-## 1. Metadata
-- **ID:** LAW-007
-- **Title:** Security
-- **Status:** L0 - Draft
-- **Version:** 1.0.0
-- **Authors:** NeelStack Engineering Team
-- **Created:** 2026-07-04
-- **Last Updated:** 2026-07-04
+# LAW-007 — Security
 
-## 2. Executive Summary
+> **"Security is not a feature you add at the end. It is the foundation you build everything on top of."**
 
-## 3. Purpose
+---
 
-## 4. Scope
+## Law Statement
 
-## 5. Audience
+**Security controls MUST be designed into every system from the start. No feature may be deployed to production without a completed security review. All secrets, credentials, and sensitive data must be managed using approved secret management tools.**
 
-## 6. Background
+---
 
-## 7. Architecture
+## Non-Negotiable Security Requirements
 
-## 8. Standards
+### Authentication & Authorization
+- Every API endpoint (except explicitly public ones) requires authentication.
+- Authorization checks use RBAC defined in NES-204.
+- JWT tokens expire within 15 minutes (access) / 7 days (refresh).
+- Multi-tenant systems enforce `tenant_id` isolation on every query.
 
-## 9. Rules
+### Secrets Management
+- **NO** secrets in source code, environment files, or Docker images.
+- All secrets stored in **HashiCorp Vault** or **AWS Secrets Manager**.
+- Secrets rotated automatically on a schedule (minimum annually, never more than 90 days for sensitive secrets).
+- `.env` files are gitignored and never committed.
 
-## 10. Decision Rationale
+### Data Protection
+- All data at rest encrypted (AES-256 minimum).
+- All data in transit over TLS 1.2+ (TLS 1.3 preferred).
+- PII data identified, classified, and access-logged.
+- Data retention policies applied to all personal data stores.
 
-## 11. Best Practices
+### Input Validation
+- All user input sanitized and validated at the API boundary.
+- SQL queries use parameterized statements only (no string concatenation).
+- File uploads validated for type, size, and content (not just extension).
 
-## 12. Anti-patterns
+---
 
-## 13. Examples
+## Security Review Gates
 
-## 14. AI Context
+| Gate | When | Reviewer |
+|---|---|---|
+| Threat Model | Before design is finalized | Security Architect |
+| Dependency Scan | Every PR (automated) | CI Pipeline |
+| SAST | Every PR (automated) | CI Pipeline |
+| Penetration Test | Before each major release | External or Internal Red Team |
+| Compliance Review | Annual | Compliance Team |
 
-## 15. Mermaid Diagrams
+---
 
-## 16. Compliance Requirements
+## Incident Response
 
-## 17. Success Metrics
+Any security incident must be reported within **1 hour** of discovery to the Security Team. See NES-518 — Incident Response for the full protocol.
 
-## 18. Checklists
+---
 
-## 19. Related Documents
+## Anti-Patterns
 
-## 20. Version History
+❌ Hardcoded API keys, passwords, or tokens in source code.  
+❌ Using HTTP instead of HTTPS in any environment.  
+❌ Storing passwords in plaintext or with MD5/SHA1.  
+❌ Bypassing authorization for "internal" endpoints.  
+❌ "We'll fix security before we go to prod."
+
+---
+
+## Related Standards
+
+- NES-600 — Secure SDLC
+- NES-601 — OWASP Security Standards
+- NES-602 — Threat Modeling
+- NES-603 — Zero Trust Architecture
+- NES-605 — Secrets Protection
+- NES-203 — Authentication & Identity
+- NES-204 — Authorization
+
+---
+
+## Version History
+
+| Version | Date | Author | Change |
+|---|---|---|---|
+| 1.0.0 | 2026-07-04 | NeelStack Engineering | Initial publication |

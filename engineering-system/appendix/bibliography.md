@@ -1,48 +1,73 @@
+---
+document_id: APPENDIX-BIB
+title: Bibliography
+subtitle: Books, papers, and foundational resources that inform the NeelStack Engineering Constitution
+version: 1.0.0
+status: L3 - Enterprise
+classification: Internal
+owner: Engineering Leadership
+review_cycle: Annual
+document_type: Reference
+---
+
 # Bibliography
 
-## 1. Metadata
-- **ID:** BIBLIOGRAPHY
-- **Title:** Bibliography
-- **Status:** L0 - Draft
-- **Version:** 1.0.0
-- **Authors:** NeelStack Engineering Team
-- **Created:** 2026-07-04
-- **Last Updated:** 2026-07-04
+Foundational books, papers, and resources that have shaped NeelStack engineering philosophy and standards.
 
-## 2. Executive Summary
+---
 
-## 3. Purpose
+## Architecture
 
-## 4. Scope
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **Domain-Driven Design** | Eric Evans | 2003 | Foundation for NES-103, LAW-001, LAW-002 |
+| **Clean Architecture** | Robert C. Martin | 2017 | Foundation for NES-104, LAW-010 |
+| **Building Microservices** (2nd ed.) | Sam Newman | 2021 | Foundation for NES-106, NES-108 |
+| **Implementing Domain-Driven Design** | Vaughn Vernon | 2013 | Supplements DDD standards |
+| **Designing Data-Intensive Applications** | Martin Kleppmann | 2017 | Foundation for NES-206, NES-211 |
+| **Software Architecture: The Hard Parts** | Ford, Richards, Sadalage, Dehghani | 2021 | Foundation for NES-103–NES-110 |
+| **Fundamentals of Software Architecture** | Richards, Ford | 2020 | Foundation for NES-100 |
 
-## 5. Audience
+## Engineering Culture
 
-## 6. Background
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **The Phoenix Project** | Kim, Behr, Spafford | 2013 | Foundation for NES-004 |
+| **The Unicorn Project** | Gene Kim | 2019 | Foundation for engineering values |
+| **Accelerate** | Forsgren, Humble, Kim | 2018 | Foundation for NES-007, NES-009 |
+| **An Elegant Puzzle** | Will Larson | 2019 | Foundation for NES-1106 |
+| **Staff Engineer** | Will Larson | 2021 | Foundation for career ladder NES-1106 |
 
-## 7. Architecture
+## DevOps & SRE
 
-## 8. Standards
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **Site Reliability Engineering** | Beyer, Jones, Petoff, Murphy (Google) | 2016 | Foundation for NES-907, NES-908 |
+| **The DevOps Handbook** | Kim, Humble, Debois, Willis | 2016 | Foundation for NES-500 series |
+| **Continuous Delivery** | Humble, Farley | 2010 | Foundation for NES-900 series |
 
-## 9. Rules
+## Security
 
-## 10. Decision Rationale
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **Threat Modeling** | Adam Shostack | 2014 | Foundation for NES-602 |
+| **The Web Application Hacker's Handbook** | Stuttard, Pinto | 2011 | Foundation for NES-601 |
 
-## 11. Best Practices
+## AI & Machine Learning
 
-## 12. Anti-patterns
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **Designing Machine Learning Systems** | Chip Huyen | 2022 | Foundation for NES-707, NES-708 |
+| **AI Engineering** | Chip Huyen | 2024 | Foundation for NES-218–NES-230 |
+| **Building LLM-Powered Applications** | Various | 2024 | Foundation for RAG standards |
 
-## 13. Examples
+## Data Engineering
 
-## 14. AI Context
+| Title | Author | Year | Relevance |
+|---|---|---|---|
+| **Fundamentals of Data Engineering** | Reis, Housley | 2022 | Foundation for NES-700 series |
+| **Data Mesh** | Zhamak Dehghani | 2022 | Foundation for NES-709 |
 
-## 15. Mermaid Diagrams
+---
 
-## 16. Compliance Requirements
-
-## 17. Success Metrics
-
-## 18. Checklists
-
-## 19. Related Documents
-
-## 20. Version History
+*This bibliography reflects the intellectual foundations of the NeelStack Engineering Constitution. Engineers are encouraged to read these works to deepen their understanding of the standards.*
