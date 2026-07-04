@@ -156,3 +156,11 @@ Desktop.ini
 *.njsproj
 *.sln
 *.swp
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/

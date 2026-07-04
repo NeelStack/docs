@@ -5,6 +5,9 @@
     "node_modules/**",
     ".git/**",
     ".github/workflows/**",
-    "**/*.md"
+    "**/*.md",
+    "__pycache__/**",
+    "**/*.pyc",
+    ".github/CODEOWNERS"
   ]
 }
