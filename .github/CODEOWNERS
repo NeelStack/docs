@@ -1,0 +1,81 @@
+# NeelStack Docs — Code Ownership
+# All reviewers must approve changes to their owned section before merging.
+
+# Global fallback — Engineering Leads review anything not explicitly owned
+* @NeelStack/engineering-leads
+
+# Root configuration files
+/.github/ @NeelStack/platform-team @NeelStack/engineering-leads
+/README.md @NeelStack/engineering-leads
+/CONTRIBUTING.md @NeelStack/engineering-leads
+/CHANGELOG.md @NeelStack/engineering-leads
+
+# Engineering Constitution — Foundation
+/engineering-system/00-foundation/ @NeelStack/cto @NeelStack/architects
+
+# Architecture Standards
+/engineering-system/01-architecture/ @NeelStack/architects
+/engineering-system/02-engineering-laws/ @NeelStack/cto @NeelStack/architects
+
+# Technology & Repository Standards
+/engineering-system/03-technology/ @NeelStack/architects @NeelStack/platform-team
+/engineering-system/04-repository/ @NeelStack/platform-team
+
+# Backend Engineering
+/engineering-system/05-backend/ @NeelStack/backend-team @NeelStack/architects
+
+# Frontend Engineering
+/engineering-system/06-frontend/ @NeelStack/frontend-team
+
+# Mobile Engineering
+/engineering-system/07-mobile/ @NeelStack/mobile-team
+
+# Platform & DevOps
+/engineering-system/08-platform/ @NeelStack/platform-team
+
+# AI Platform
+/engineering-system/09-ai/ @NeelStack/ai-team @NeelStack/architects
+
+# Data Platform
+/engineering-system/10-database/ @NeelStack/data-team
+
+# Security & Compliance
+/engineering-system/11-security/ @NeelStack/security-team
+
+# Platform Governance
+/engineering-system/12-devops/ @NeelStack/engineering-leads @NeelStack/architects
+
+# Testing Standards
+/engineering-system/13-testing/ @NeelStack/qa-team
+
+# Production & Operations
+/engineering-system/14-production/ @NeelStack/platform-team @NeelStack/sre-team
+
+# Product Engineering
+/engineering-system/15-development/ @NeelStack/product-leads
+
+# Design System
+/engineering-system/16-design-system/ @NeelStack/design-system-team @NeelStack/frontend-team
+
+# Templates
+/engineering-system/17-templates/ @NeelStack/architects
+
+# Checklists
+/engineering-system/18-checklists/ @NeelStack/engineering-leads
+
+# Architecture Decision Records
+/engineering-system/19-adrs/ @NeelStack/architects @NeelStack/engineering-leads
+
+# RFCs
+/engineering-system/20-rfcs/ @NeelStack/architects
+
+# Reference Implementations & Diagrams
+/engineering-system/21-reference-implementation/ @NeelStack/architects
+
+# Product Documentation
+/product-docs/eduos/ @NeelStack/eduos-team
+/product-docs/toolvines/ @NeelStack/toolvines-team
+/product-docs/dhruvaos/ @NeelStack/dhruvaos-team
+/product-docs/naukarimitra/ @NeelStack/naukarimitra-team
+/product-docs/sarkarimitra/ @NeelStack/sarkarimitra-team
+/product-docs/shared-platform/ @NeelStack/platform-team

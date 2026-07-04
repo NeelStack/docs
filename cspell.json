@@ -1,0 +1,16 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "ignorePaths": [
+    "node_modules/**",
+    ".git/**",
+    ".github/workflows/**",
+    "**/*.md",
+    "__pycache__/**",
+    "**/*.pyc",
+    ".github/CODEOWNERS",
+    ".gitignore",
+    "cspell.json",
+    ".github/cspell.json"
+  ]
+}

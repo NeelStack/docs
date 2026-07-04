@@ -33,6 +33,8 @@ Ensure files follow the correct prefixes:
 - **NES**: NeelStack Engineering Standard
 - **NAP**: NeelStack Architecture Principle
 - **LAW**: Engineering Law
+- **TECH**: Technology Standard
+- **REPO**: Repository Standard
 - **ADR**: Architecture Decision Record
 - **RFC**: Request for Comments
 - **NST**: Template

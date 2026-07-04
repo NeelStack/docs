@@ -1,0 +1,13 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http"
+    },
+    {
+      "pattern": "^file:"
+    },
+    {
+      "pattern": "^mailto:"
+    }
+  ]
+}
