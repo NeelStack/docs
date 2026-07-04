@@ -14,9 +14,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clean remaining legacy files
-        run: python3 clean_remaining.py
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -35,9 +32,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clean remaining legacy files
-        run: python3 clean_remaining.py
-
       - name: Check markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@v1
         with:
@@ -53,9 +47,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Clean remaining legacy files
-        run: python3 clean_remaining.py
-
       - name: Run CSpell
         uses: streetsidesoftware/cspell-action@v5
         with:
@@ -67,9 +58,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Clean remaining legacy files
-        run: python3 clean_remaining.py
 
       - name: Check YAML frontmatter on NES-2xx+ documents
         run: python3 validate_structure.py
