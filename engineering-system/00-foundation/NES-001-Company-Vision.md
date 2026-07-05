@@ -338,7 +338,7 @@ NeelStack products should function as an integrated ecosystem.
 
  ┌──────────┼──────────┬───────────┐
  │          │          │           │
-EduOS   ToolVines  Future SaaS  Internal Tools
+DhruvaOS  ToolVines  Future SaaS  Internal Tools
 ```
 
 Every new product should reuse platform capabilities instead of rebuilding them.
@@ -680,9 +680,9 @@ NeelStack is expected to grow into an ecosystem rather than a single software co
 
                             │
 
- ┌────────────┬────────────┬────────────┬────────────┐
- │            │            │            │            │
-EduOS    ToolVines   DhruvaOS   Future ERP   Future CRM
+  ┌────────────┬────────────┬────────────┬────────────┬────────────┐
+  │            │            │            │            │            │
+DhruvaOS    ToolVines    Future ERP   Future CRM   Future HRMS
 
                             │
 
