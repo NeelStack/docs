@@ -106,7 +106,7 @@ Those are covered in later standards.
                                       │
                      EduOS │ Future Platform Applications
                                       │
-                     Event Bus (RabbitMQ / Socket.io)
+                      Event Bus (RabbitMQ / WebSockets)
                                       │
                   Background Workers & Async Processing
                                       │
@@ -211,7 +211,7 @@ Includes:
 
 - REST
 - Webhooks Dispatcher
-- Real-time Socket.io channels
+- Real-time WebSockets channels
 - Queues (RabbitMQ)
 
 ---

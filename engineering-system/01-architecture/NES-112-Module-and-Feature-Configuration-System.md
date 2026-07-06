@@ -64,7 +64,7 @@ CREATE TABLE modules (
     description         TEXT,
     category            VARCHAR(50) NOT NULL,            -- 'ai' | 'academic' | 'operations' | 'communication' | 'core'
     depends_on          VARCHAR(50)[] DEFAULT '{}',       -- e.g. grade_prediction depends on exams
-    requires_service    VARCHAR(50),                      -- 'ai-gateway' | 'sockets' | NULL — informs compose generation
+    requires_service    VARCHAR(50),                      -- 'ai-gateway' | NULL — informs compose generation
     is_core             BOOLEAN NOT NULL DEFAULT FALSE,   -- cannot be disabled (auth, tenant admin, billing)
     config_schema       JSONB,                            -- JSON Schema describing valid `config` shape for this module
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()

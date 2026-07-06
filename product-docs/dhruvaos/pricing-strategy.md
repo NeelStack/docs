@@ -16,7 +16,7 @@ DhruvaOS adopts a **per-student, per-month SaaS** billing model. This ensures pr
 - **Target**: Private K-12 schools, CBSE/ICSE colleges, and medium academies.
 - **Limit**: Up to 2000 active students.
 - **Price**: ₹75 / student / month (billed annually).
-- **Features**: Everything in Starter + Examination, Payroll, HR, Library, Hostel, Transportation, Socket.io chat, Capacitor Mobile App, and Parent Portal.
+- **Features**: Everything in Starter + Examination, Payroll, HR, Library, Hostel, Transportation, Real-time chat, Capacitor Mobile App, and Parent Portal.
 - **AI Add-on**: Base prompt Q&A assistant (500 tokens/student included).
 
 ### 2.3 Enterprise Tier

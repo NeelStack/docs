@@ -535,11 +535,6 @@ services:
     restart: unless-stopped
     # ... config
 
-  sockets:
-    build: ../../services/sockets
-    restart: unless-stopped
-    # ... config
-
   web:
     build: ../../apps/web
     restart: unless-stopped

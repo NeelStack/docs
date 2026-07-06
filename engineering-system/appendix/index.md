@@ -159,6 +159,7 @@ document_type: Reference
 | NES-228 | AI Platform Operations | L3 |
 | NES-229 | AI Platform Disaster Recovery | L3 |
 | NES-230 | AI Platform Reference Architecture | L3 |
+| NES-231 | AI Development Guide | L0 |
 
 ---
 

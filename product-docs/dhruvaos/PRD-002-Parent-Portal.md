@@ -28,7 +28,7 @@ Feature: Parent Mobile Dashboard
 - **Mobile Client**: Capacitor 7 wrapped React Native/Web client.
 - **Attendance Module**: Reads raw date listings from the `attendance` table.
 - **Accounts/Payments Module**: Fetches outstanding fee ledgers and initiates payments.
-- **WebSocket Gateway**: Socket.io connection for real-time chat messages.
+- **WebSocket Gateway**: WebSocket connection for real-time chat messages.
 - **FCM Push Notification**: Custom deep linking URL scheme (`dhruvaos://`) integration on mobile.
 
 ## 5. Success Metrics
