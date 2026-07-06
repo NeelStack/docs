@@ -26,7 +26,7 @@ Every inference request flowing through the AI Gateway follows a strict pipeline
   [Client Request]
          │
          ▼
- 1. Authentication          ──► Validates OIDC JWT (Keycloak)
+ 1. Authentication          ──► Validates OIDC JWT (Zitadel)
          │
          ▼
  2. Tenant Resolution       ──► Establishes active school_id context
@@ -428,3 +428,19 @@ To prevent cost overruns in a multi-tenant environment, the platform tracks cost
 1. **Daily budget checks**: Every request checks Redis for current daily USD cost.
 2. **Quota Enforcement**: If a tenant's daily consumption exceeds their subscribed tier limit, the service raises a `HTTP 402 Payment Required` exception.
 3. **Usage logging**: Inference parameters (input/output tokens, models used) are dispatched to the auditing logs for invoice compiling.
+
+---
+
+# 16. Unified AI Registry & Multi-Tier Memory
+
+Every specialized agent and tool must register with the dynamic AI Gateway registry to facilitate automated discovery:
+
+1. **Tool Registry (`ToolRegistry`)**:
+   - Decorated with `@ToolRegistry.register_tool(name, description)`.
+   - Exposes local Python helpers (database queries, grading rubrics) to LLM agent interfaces.
+   - Automatically parses signature definitions to output the parameters JSON schema.
+2. **Agent Registry (`AgentRegistry`)**:
+   - Decorated with `@AgentRegistry.register_agent(intent, description)`.
+   - Maps intent keywords (e.g., `monitor_attendance`, `fee_collection`) dynamically to execution classes, eliminating hardcoded orchestrator conditionals.
+3. **Multi-Tier AI Memory (`AIMemoryManager`)**:
+   - Decoupled from core logic to manage user preferences, session dialogue history, and institution-wide RAG states dynamically.

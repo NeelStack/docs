@@ -1,19 +1,23 @@
-# ADR-008 — RabbitMQ over Kafka
+---
+ADR-008: NATS + JetStream over Kafka and RabbitMQ
+Status: Accepted
+Date: 2026-07-06
 
-## Status
-**Accepted** — In effect as of 2026-07-04
+Context:
+DhruvaOS plugins require high-throughput asynchronous event communication (enrollment alerts, attendance logs, webhook distributions). We need a messaging broker that provides message persistence (streaming and replay capabilities) while running on local developer laptops with zero performance overhead. Our team size is small, which constraints our ability to maintain complex message clustering technologies.
 
-## Context
-Our backend microservices require asynchronous background task routing (notification triggers, Razorpay fee validations, database indexing pipelines).
+Decision:
+We chose NATS + JetStream as our primary event broker and message streaming system.
 
-We evaluated:
-1. **Apache Kafka**: High throughput, log-based partitioning, but complex cluster setup and management.
-2. **RabbitMQ**: AMQP-compliant message queue broker. Light resource footprint, direct support for routing keys and exchange patterns.
+Alternatives Considered:
+- Apache Kafka: Rejected due to the operational complexity of KRaft/ZooKeeper node management, heavy memory overhead (requires JVM), and steep setup costs relative to our team's operational capacity.
+- RabbitMQ: Rejected because its native broker configurations do not support stream persistence or message replay out-of-the-box, requiring specialized management extensions.
+- AWS SQS: Rejected because it introduces AWS platform lock-in, lacks local offline support, and does not provide unified pub/sub topic patterns.
 
-## Decision
-We chose **RabbitMQ** as our primary message queue broker. Given our current operational load, we do not require the petabyte-scale stream storage of Kafka. RabbitMQ's simple exchange-to-queue bindings are perfect for asynchronous dispatch routing.
+Consequences:
+We commit to using NATS JetStream protocols via the unified `PlatformSDK.events` namespace. We accept the tradeoff that NATS has a smaller developer ecosystem and fewer pre-built integrations than Kafka or RabbitMQ, meaning we must construct schema validation pipelines and backpressure buffering layers manually inside our kernel code.
 
-## Consequences
-- **Infrastructure**: Simple setup via docker-compose (`rabbitmq:3.13-management-alpine`).
-- **Development**: Low development latency, simple async libraries (`aio-pika`).
-- **Scale**: Easy upgrade to managed RabbitMQ services (CloudAMQP) when scaling.
+Revisit Triggers:
+- If our event processing pipeline grows to ingest more than 100,000 events per second and requires Kafka-style partitioned logs disk scaling.
+- If we merge with or deploy onto a customer environment where NATS ports are completely restricted by internal networking compliance rules.
+---

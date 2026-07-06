@@ -525,6 +525,11 @@ services:
     restart: unless-stopped
     # ... config
 
+  nats:
+    image: nats:2.10-alpine
+    restart: unless-stopped
+    # ... config
+
   core-api:
     build: ../../services/core
     restart: unless-stopped
@@ -569,7 +574,7 @@ services:
       ZITADEL_DATABASE_POSTGRES_HOST: postgres
       ZITADEL_MASTERKEY: ${ZITADEL_MASTERKEY}
     restart: unless-stopped
-    # NOTE: No OpenSearch, no RabbitMQ — uses PostgreSQL FTS + Redis
+    # NOTE: No OpenSearch, no NATS — uses PostgreSQL FTS + Redis
 ```
 
 ## Deployment Commands Per Model

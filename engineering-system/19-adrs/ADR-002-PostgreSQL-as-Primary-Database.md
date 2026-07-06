@@ -1,59 +1,23 @@
 ---
-document_id: ADR-002
-title: PostgreSQL as Primary Database
-status: Accepted
-date: 2026-07-04
-deciders: CTO, Chief Architect, Data Lead
-consulted: Backend Engineering Team
-informed: All Engineering
+ADR-002: PostgreSQL + pgvector as Primary Datastore
+Status: Accepted
+Date: 2026-07-06
+
+Context:
+DhruvaOS needs a transactional datastore with ACID safety guarantees for complex educational records (enrollments, grading, billing) combined with semantic search capabilities for AI-native workflows (RAG queries and agent tools). Operating a standalone vector database alongside a relational database increases operational overhead, cost, and introduces data synchronization replication lag challenges. The system must remain lightweight enough to run locally in a single Docker container.
+
+Decision:
+We chose PostgreSQL with the pgvector extension as our unified transactional and vector datastore.
+
+Alternatives Considered:
+- Pinecone: Rejected because it is a closed-source SaaS-only vector database which violates our self-hosted/offline requirement, incurs high external costs, and splits state into two separate systems.
+- Weaviate / Milvus: Rejected because running a separate dedicated vector database cluster adds high RAM overhead (minimum 1-2GB per instance) and creates complex transactional boundary issues when synchronizing data updates.
+- MongoDB: Rejected because its relational integrity constraints, cross-collection transaction locks, and vector index configurations do not meet the performance requirements of our multi-tenant schemas.
+
+Consequences:
+We commit to managing indexes (`HNSW` / `IVFFlat`) within PostgreSQL. We accept the tradeoff that high-dimensional vector search queries share CPU and memory pools with transactional billing/attendance queries, requiring PgBouncer query pooling and limits to prevent resource starvation.
+
+Revisit Triggers:
+- If a tenant's vector embedding collection grows beyond 10 million active dimensions and semantic search latency breaches a p99 threshold of 150ms.
+- If compliance or security requirements mandate a physically separate, certified vector store.
 ---
-
-# ADR-002 — PostgreSQL as Primary Database
-
-## Status
-
-**Accepted** — In effect as of 2026-07-04
-
-## Context
-
-NeelStack requires a primary relational database supporting:
-- ACID transactions for financial and enrollment data
-- Multi-tenant row-level security
-- JSON/JSONB for flexible schema evolution
-- Vector embeddings for AI features (pgvector)
-- Full-text search capability
-- Cloud-managed options on AWS
-
-## Decision
-
-**We will use PostgreSQL 16+** as the primary relational database for all NeelStack services.
-
-## Consequences
-
-### Positive
-- ACID compliance for billing and enrollment correctness
-- `pgvector` extension enables AI embedding storage without a separate vector database
-- Row-Level Security enables tenant isolation at the database layer
-- JSONB enables schema flexibility without schema migrations for metadata
-- AWS RDS and Aurora PostgreSQL provide managed options
-- Excellent SQLAlchemy and Alembic support
-
-### Negative
-- Not ideal for time-series data at scale (use TimescaleDB for that)
-- Not ideal for graph data (use Neo4j for complex relationships)
-- Requires careful index management at scale
-
-## Alternatives Considered
-
-| Alternative | Rejected Reason |
-|---|---|
-| MySQL | Weaker JSONB support, no pgvector, weaker RLS |
-| MongoDB | No ACID transactions across documents, harder to enforce schema |
-| CockroachDB | Additional complexity, cost premium |
-| DynamoDB | NoSQL — loses relational integrity for complex domain models |
-
-## Related Standards
-
-- NES-207 — PostgreSQL Standards
-- TECH-005 — PostgreSQL Standard
-- NES-206 — Data Architecture
