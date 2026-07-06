@@ -2,8 +2,8 @@
 document_id: NES-101
 title: System Architecture
 subtitle: Enterprise Reference Architecture for the NeelStack Ecosystem
-version: 1.0.0
-status: Draft
+version: 2.0.0
+status: Approved
 classification: Internal
 owner: Chief Solution Architect
 review_cycle: Every 6 Months
@@ -45,7 +45,7 @@ It defines:
 - Core architectural layers
 - Shared platform services
 - Communication patterns
-- Deployment model
+- Deployment models
 - Technology boundaries
 - Operational architecture
 
@@ -85,34 +85,34 @@ Those are covered in later standards.
 # System Vision
 
 ```text
-                        Customers
-                             │
-                    Web • Mobile • API
-                             │
-                    Cloudflare CDN / WAF
-                             │
-                     Next.js Web Portal
-                             │
-                      API Gateway Layer
-                             │
-      ┌────────────────────────────────────────────┐
-      │          Platform Service Layer            │
-      │--------------------------------------------│
-      │ Identity │ AI │ Billing │ Search │ Audit   │
-      │ Notify   │ File │ Config │ Workflow │ etc. │
-      └────────────────────────────────────────────┘
-                             │
-                 Domain Application Services
-                             │
-    EduOS │ ToolVines │ CRM │ HRMS │ Healthcare │ Future Apps
-                             │
-                   Event Bus (Kafka / NATS)
-                             │
-             Background Workers & Async Processing
-                             │
-     PostgreSQL │ Redis │ Object Storage │ Vector DB
-                             │
-     Observability │ Monitoring │ Logging │ Metrics
+                                  Customers
+                                      │
+                             Web • Mobile • API
+                                      │
+                                Traefik Proxy
+                                      │
+                              Next.js Web Portal
+                                      │
+                        Core API Gateway (FastAPI)
+                                      │
+       ┌─────────────────────────────────────────────────────────────┐
+       │                   Platform Service Layer                    │
+       │-------------------------------------------------------------│
+       │ Identity (OIDC)   │ Local & Remote AI │ Billing (Checkout)  │
+       │ Webhooks Registry │ GDPR / DPDP Act   │ Uptime SLA Tracker  │
+       └─────────────────────────────────────────────────────────────┘
+                                      │
+                         Domain Application Services
+                                      │
+                     EduOS │ Future Platform Applications
+                                      │
+                     Event Bus (RabbitMQ / Socket.io)
+                                      │
+                  Background Workers & Async Processing
+                                      │
+             PostgreSQL (pgvector) │ Redis │ Object Storage
+                                      │
+                 Structured Mutation Audit & Telemetry
 ```
 
 ---
@@ -128,7 +128,7 @@ Responsible for user interaction.
 Includes:
 
 - Next.js Web
-- Flutter Mobile
+- Capacitor Mobile (React/Vite)
 - Public APIs
 - Admin Portal
 
@@ -148,7 +148,7 @@ Provides external protection.
 Components:
 
 - CDN
-- WAF
+- Traefik Reverse Proxy
 - Rate Limiting
 - DNS
 - SSL
@@ -164,13 +164,11 @@ Acts as the single entry point.
 
 Responsibilities:
 
-- Authentication
-- Authorization
+- Tenant Domain Normalization (`normalise_domain()` stripping www and ports)
+- OIDC / SAML 2.0 SSO Authentication
 - API Routing
-- Request Validation
-- Rate Limiting
-- API Versioning
-- Request Logging
+- Redis Sliding-Window Rate Limiting
+- Security Headers Injection (HSTS, CSP, X-Frame)
 
 ---
 
@@ -180,14 +178,11 @@ Provides reusable capabilities.
 
 Examples:
 
-- Identity
-- Notification
-- Search
-- AI Gateway
-- Billing
-- Audit
-- Workflow
-- Configuration
+- Identity (Zitadel / OAuth)
+- Webhooks Registry (HMAC signatures + retries)
+- Uptime SLA Credit Engine
+- Central Licensing Validator (grace period management)
+- Central Billing Manager (Stripe / Razorpay)
 
 Every product consumes these services.
 
@@ -201,9 +196,8 @@ Examples:
 
 - Student Management
 - Course Management
-- SEO Analysis
-- Customer Management
-- Healthcare Records
+- Attendance Logging
+- Exam Management
 
 Business rules live only here.
 
@@ -216,11 +210,9 @@ Responsible for communication.
 Includes:
 
 - REST
-- Webhooks
-- Events
-- Queues
-- External APIs
-- Third-party Integrations
+- Webhooks Dispatcher
+- Real-time Socket.io channels
+- Queues (RabbitMQ)
 
 ---
 
@@ -230,13 +222,10 @@ Provides persistence.
 
 Technologies:
 
-- PostgreSQL
-- Redis
+- PostgreSQL (SaaS RLS, Schema Isolation, or Dedicated Decrypted DB connections)
+- Redis Cache
 - Object Storage
-- Vector Database
-- Search Index
-
-Every domain owns its data.
+- Vector Database (Postgres pgvector with school_id composite keys)
 
 ---
 
@@ -246,183 +235,36 @@ Responsible for production operations.
 
 Includes:
 
-- Monitoring
-- Logging
+- Monitoring (Prometheus)
+- Logging (Structured mutation audits)
 - Metrics
-- Tracing
-- Alerting
-- Backup
-- Disaster Recovery
+- OpenTelemetry Tracing
 
 ---
 
-# Core Architectural Principles
+# The Four-Model Deployment Topology
 
-Every architecture must satisfy:
+NeelStack is built on a single unified codebase that dynamically configures itself to target:
 
-- Platform First
-- Domain Driven
-- API First
-- Event Driven
-- Stateless
-- Secure by Design
-- Observable by Default
-- AI Native
-- Cloud Native
-- Automation First
+1. **SaaS Multi-Tenant**: Shared PostgreSQL database instance with dynamic row-level security (RLS) filtering logic.
+2. **White Label**: Per-tenant styling custom CSS variables and custom domain routing (matching both subdomains and apex hosts).
+3. **Dedicated Cloud**: Isolated physical database instances. Connection parameters decrypted dynamically via AES Fernet `EncryptedString` type decorators.
+4. **Self-Hosted (On-Premise)**: Deployment container bundle configured via env variables. Leverages local sidecars for offline speech-to-text (Whisper) and chat/embedding engines (Ollama).
 
 ---
 
-# Product Ecosystem
+# 9-Layer AI Gateway Architecture
 
-Current products:
+NeelStack features a dedicated async AI Gateway microservice (`dhruva-ai`) decoupled from relational database schemas:
 
-- EduOS
-- ToolVines
-
-Planned products:
-
-- CRM
-- HRMS
-- ERP
-- Healthcare Platform
-- AI Platform
-
-All products consume shared platform capabilities.
-
----
-
-# Shared Platform Services
-
-The platform provides:
-
-- Identity
-- RBAC
-- Notifications
-- Billing
-- Search
-- File Storage
-- AI Gateway
-- Audit
-- Analytics
-- Configuration
-- Workflow
-- Feature Flags
-
-Products should never duplicate these services.
-
----
-
-# Communication Model
-
-Preferred communication hierarchy:
-
-1. Internal Function Calls (within module)
-2. Module Contracts
-3. REST APIs
-4. Asynchronous Events
-5. External Integrations
-
-Choose the simplest communication mechanism that satisfies the requirement.
-
----
-
-# Deployment Model
-
-Each deployable unit is independently versioned.
-
-Deployables include:
-
-- Web Application
-- Backend API
-- Worker
-- Scheduler
-- AI Service
-- Platform Services
-
-Deployment independence enables faster delivery and safer releases.
-
----
-
-# Cross-Cutting Concerns
-
-The following concerns apply to every layer:
-
-- Authentication
-- Authorization
-- Logging
-- Metrics
-- Tracing
-- Audit
-- Error Handling
-- Configuration
-- Feature Flags
-- Security
-
-These capabilities should be implemented consistently.
-
----
-
-# Architecture Decision Rules
-
-Before introducing a new service, technology, or architectural pattern, engineers should evaluate:
-
-- Does it solve a business problem?
-- Can the platform provide it?
-- Is it reusable?
-- Does it increase operational complexity?
-- Can existing standards solve the problem?
-
-New architecture requires documented justification.
-
----
-
-# Production Readiness Checklist
-
-Before any system enters production:
-
-- [ ] Architecture reviewed
-- [ ] ADRs approved
-- [ ] Security review completed
-- [ ] Performance validated
-- [ ] Monitoring configured
-- [ ] Logging implemented
-- [ ] Metrics exposed
-- [ ] Health checks available
-- [ ] Documentation completed
-- [ ] Runbooks prepared
-- [ ] Disaster recovery verified
-
----
-
-# Success Criteria
-
-The architecture is successful when:
-
-- Every product follows the same architectural model.
-- Shared platform adoption increases every quarter.
-- New engineers become productive quickly.
-- AI-generated code aligns with standards.
-- Operational complexity decreases as products grow.
-
----
-
-# Future Evolution
-
-Future versions of this document will include:
-
-- C4 Context Diagram
-- C4 Container Diagram
-- C4 Component Diagram
-- UML Deployment Diagram
-- Sequence Diagrams
-- Network Topology
-- Multi-Region Architecture
-- Disaster Recovery Architecture
-- Zero Trust Architecture
-- AI Platform Architecture
-- Kubernetes Deployment Reference
-- Example Production Repository
+1. **Layer 1 — Infrastructure**: pgvector schema mapping and database connection pooling.
+2. **Layer 2 — AI Content Generation**: Lesson planning and comment generation.
+3. **Layer 3 — Persona Gateways**: Interfaces optimized for student tutoring, parent questions, admin overviews, and CFO cash flow models.
+4. **Layer 4 — Ingestion Pipeline**: Document text extraction, semantic chunking, and index upsert runs.
+5. **Layer 5 — Predictive early warnings**: Grade decline, dropout risk, and payment default projections.
+6. **Layer 7 — Multimodal Integration**: Voice class registers and optical sheet assessment.
+7. **Layer 8 — Agentic Workflows**: Event-driven task orchestrators mapping specialized workers.
+8. **Layer 9 — AI Governance**: Disparate impact audits, bias checks, and immutable cryptographically signed logs.
 
 ---
 
@@ -430,8 +272,8 @@ Future versions of this document will include:
 
 **Document:** NES-101 — System Architecture
 
-**Version:** 1.0.0 (Draft)
+**Version:** 2.0.0 (Approved)
 
-**Status:** Ready for Architecture Review
+**Status:** Active Reference Standard
 
 **Next Document:** **NES-102 — Monorepo Architecture**
