@@ -14,17 +14,15 @@ next_document: NES-1306 Admin Starter
 
 # NES-1305 — Mobile Starter
 
-> **"Accelerate mobile development with React Native and Expo. This starter kit provides a production-ready repository configured with Expo Router, NativeWind, Zustand, and MSW."**
+> **"Accelerate mobile development with React, Vite, and Capacitor. This starter kit provides a production-ready repository configured with React Router v7, Tailwind CSS, Zustand, and Vitest."**
 
 ---
 
 # Executive Summary
 
-To help developer teams launch new mobile application features quickly while maintaining architectural alignment, performance standards, and security compliance, we provide the **Mobile Starter Kit**.
+To help development teams launch new mobile features quickly while maintaining architectural alignment, performance, and security compliance, we provide the **Mobile Starter Kit**.
 
-This starter kit contains a pre-configured template containing file-based routing, style theme tokens, state management caches, offline-first connection handlers, and testing configs.
-
-This document establishes the repository structure, approved tech stack, quick start guide, and verification steps for the Mobile Starter template.
+This starter kit contains a pre-configured Vite + Capacitor template featuring single-page routing, global state stores, local security plugin wrappers, and unit testing environments.
 
 ---
 
@@ -41,19 +39,25 @@ This standard defines:
 
 # Repository Directory Structure
 
-The Mobile Starter repository utilizes a clean React Native directory structure:
+The Mobile Starter repository uses a clean web directory structure compiled into native platforms:
 
 ```text
 mobile-starter/
-├── app/                   # Expo Router screens (Tabs, Stacks layout)
-├── components/            # Reusable UI component elements
-├── hooks/                 # Custom React hooks (TanStack queries)
-├── store/                 # Global state stores (Zustand)
-├── utils/                 # Utilities and helper modules
+├── android/               # Android Studio native platform project
+├── ios/                   # Xcode native platform project
+├── public/                # Static public assets (icons, splash)
+├── src/                   # React Single Page Application container
+│   ├── components/        # Reusable UI component wrappers
+│   ├── features/          # Feature domains modules
+│   ├── routes/            # React Router v7 configurations
+│   ├── services/          # API clients and Capacitor native bridges
+│   ├── stores/            # Zustand global state stores
+│   └── main.tsx           # Application entry point
 ├── .github/
-│   └── workflows/         # EAS Build and Test workflows
-├── app.json               # Expo configurations & plugins
-├── tailwind.config.js     # Style theme tokens config
+│   └── workflows/         # Build and Test workflows
+├── capacitor.config.ts    # Capacitor config
+├── vite.config.ts         # Vite bundler configuration
+├── tailwind.config.js     # Tailwind CSS config
 └── README.md
 ```
 
@@ -63,11 +67,11 @@ mobile-starter/
 
 The template includes our approved technology stack configured for production:
 
-- **Framework**: Expo (SDK 51+), React Native.
-- **Routing**: Expo Router (file-based).
-- **Styling**: NativeWind (Tailwind CSS v3).
-- **State Management**: Zustand (Client), TanStack Query v5 (Server), AsyncStorage.
-- **Testing**: Jest, React Native Testing Library, Mock Service Worker (MSW).
+- **Framework**: React 19 + Vite 6 + Capacitor 7.
+- **Routing**: React Router Dom v7.
+- **Styling**: Tailwind CSS v3 + safe area utility classes.
+- **State Management**: Zustand (Client), TanStack Query v5 (Server), `@capacitor/preferences` persistence.
+- **Testing**: Vitest, React Testing Library, Mock Service Worker (MSW).
 
 ---
 
@@ -81,11 +85,20 @@ Developers can spin up the local development sandbox inside 2 minutes:
    ```bash
    npm install
    ```
-4. **Start Development Server**: Launch Expo Go development server:
+4. **Compile Assets**: Build the web package:
    ```bash
-   npm start
+   npm run build
    ```
-5. **Run on Simulators**: Press `i` to launch on iOS Simulator, or `a` for Android Emulator.
+5. **Sync Platforms**: Copy build files to native containers:
+   ```bash
+   npx cap sync
+   ```
+6. **Run on Simulators**: Compile and boot on iOS or Android:
+   ```bash
+   npx cap run ios
+   # or
+   npx cap run android
+   ```
 
 ---
 
@@ -93,9 +106,9 @@ Developers can spin up the local development sandbox inside 2 minutes:
 
 The template includes built-in security features to prevent vulnerability leakage:
 
-- **Secure Store Integration**: Out-of-the-box configuration for `expo-secure-store` to encrypt tokens.
-- **Network Security Configuration**: SSL Pinning parameters pre-configured inside app profiles.
-- **EAS Configs**: Ready-to-run configurations for EAS Build and OTA updates pipelines.
+- **Secure Storage Integration**: Out-of-the-box configuration for `@capacitor-community/secure-storage` to encrypt tokens.
+- **Network Security Configuration**: SSL Pinning parameters pre-configured inside native profiles.
+- **Vite Bundle Obfuscation**: JavaScript bundle obfuscator activated for production compilations.
 
 ---
 
@@ -103,19 +116,18 @@ The template includes built-in security features to prevent vulnerability leakag
 
 ❌ **Direct State Mutability**: Modifying state attributes directly inside views instead of executing Zustand actions.
 
-❌ **Exposing Access Tokens in Plaintext**: Storing user tokens in cleartext AsyncStorage volumes instead of using `expo-secure-store` API structures.
+❌ **Exposing Access Tokens in Plaintext**: Storing user tokens in cleartext Preferences volumes instead of using secure storage wrappers.
 
-❌ **Omitting Component Tests**: Adding screens without writing Jest rendering checks.
+❌ **Omitting Component Tests**: Adding screens without writing Vitest rendering checks.
 
 ---
 
 # Production Checklist
 
 - [ ] Template repository clone completes cleanly.
-- [ ] Local Expo development server runs successfully.
+- [ ] Local web build runs and syncs to platforms successfully.
 - [ ] App renders properly in simulators.
 - [ ] CI pipeline linting and unit tests pass.
-- [ ] EAS configs are mapped.
 
 ---
 
@@ -123,7 +135,7 @@ The template includes built-in security features to prevent vulnerability leakag
 
 The Mobile Starter template is successful when:
 - Teams can spin up a new mobile screen in less than 5 minutes.
-- The template codebase passes local Jest unit checks with zero failures.
+- The template codebase passes local Vitest unit checks with zero failures.
 - Render speeds maintain 60 FPS in simulator performance tests.
 
 ---

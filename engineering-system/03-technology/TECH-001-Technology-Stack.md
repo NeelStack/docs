@@ -30,7 +30,7 @@ Any deviation from this stack requires a formal **ARB (Architecture Review Board
 | Layer | Technology | Version Policy |
 |---|---|---|
 | **Web Frontend** | Next.js 15 + React 19 | LTS, pin exact version |
-| **Mobile** | React Native + Expo SDK 52+ | Pin exact SDK |
+| **Mobile** | React 19 + Vite + Capacitor 7 | Pin exact SDK |
 | **Backend** | FastAPI + Python 3.12+ | Pin minor version |
 | **Primary Database** | PostgreSQL 16+ | Pin major version |
 | **Cache** | Redis 7+ | Pin major version |
@@ -80,7 +80,7 @@ Any deviation from this stack requires a formal **ARB (Architecture Review Board
 Approved packages for each layer are documented in their respective technology standards:
 - **Frontend**: NES-300 — Frontend Engineering Standards
 - **Backend Python**: NES-200 — Python Engineering Standards
-- **Mobile**: NES-400 — React Native Standards
+- **Mobile**: NES-400 — Capacitor Mobile Standards
 - **AI/ML**: NES-218 — AI Knowledge Platform
 
 ---

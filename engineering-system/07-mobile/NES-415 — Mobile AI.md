@@ -1,7 +1,7 @@
 ---
 document_id: NES-415
 title: Mobile AI
-subtitle: Enterprise Mobile AI Orchestration, On-Device Models & Speech Standards
+subtitle: Enterprise Mobile AI Orchestration & Speech Standards
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -20,11 +20,11 @@ next_document: NES-416 Mobile Reference Architecture
 
 # Executive Summary
 
-Mobile devices possess specialized hardware (Neural Engine on iOS, NPU on Android) capable of executing machine learning models directly on the client.
+Mobile devices possess specialized hardware (NPUs, Neural Engines) that can run models directly in local WebViews via WebAssembly or native plug bindings.
 
-Additionally, mobile applications consume large language models (LLMs) via cloud APIs for document intelligence, support agents, and code validation.
+Additionally, our mobile applications connect to LLM web APIs for summarizations, visual document parsing, and educational chatbots.
 
-This standard defines the architecture, security parameters, and performance boundaries for orchestrating AI features on mobile devices.
+This standard outlines rules for task division, on-device AI runtimes, secure gateway access, and speech APIs inside WebView wrappers.
 
 ---
 
@@ -32,112 +32,127 @@ This standard defines the architecture, security parameters, and performance bou
 
 This standard defines:
 
-- Local vs. Remote AI workloads
-- On-Device Machine Learning (ONNX, TensorFlow Lite)
-- Cloud LLM Orchestration and API Security
-- Speech-to-Text (STT) and Text-to-Speech (TTS) integration
-- Client Context and Privacy safeguards
+- Local vs. Remote task division guidelines
+- On-device AI utilizing WebAssembly (Wasm) and ONNX
+- Cloud AI gateway patterns
+- Speech Integration (TTS/STT) via web standard APIs
+- PII sanitization constraints
 
 ---
 
-# Local vs. Remote AI Workload Division
+# Local vs. Remote Task Division
 
-AI features must be partitioned strategically to manage battery usage, device storage limitations, and network latency:
-
-| Workload Type | Execution Location | Technologies | Rationale |
+| Task Type | Environment | Technology | Rationale |
 |---|---|---|---|
-| Image Classification, OCR Pre-processing, Text Tokenization | **On-Device (Local)** | ONNX Runtime / CoreML | Zero latency, offline support, zero cloud billing. |
-| Chat Assistants, Document Summarization, RAG Queries | **Cloud (Remote)** | OpenAI / Anthropic via API Gateway | Heavy computing requirements, proprietary prompts protection. |
+| Image OCR pre-processing, text tokenizations, simple models | **On-Device (Local)** | ONNX Runtime Web (Wasm) | Low latency, no network cost, data stays local. |
+| Chatbots, document summarizations, RAG search | **Cloud (Remote)** | OpenAI / Gemini via Gateway | Requires high compute resource; prompt security. |
 
 ---
 
-# On-Device Machine Learning (ONNX Runtime)
+# On-Device Machine Learning (ONNX Web)
 
-We standardize on **ONNX Runtime (or TensorFlow Lite)** for running local, compiled models on mobile.
+We use **ONNX Runtime Web** (WebAssembly backed) to execute client-side classifiers inside the WebView.
 
-- **Model size limit**: Local model sizes must be kept below **15MB** to prevent app store download limits.
-- **Async Execution**: Models must run inside separate web workers or async native tasks to prevent freezing the UI thread during computation cycles.
+- **Size Threshold**: Local model binaries must remain under **15MB** to prevent slow application starts.
+- **Background Workers**: Run inference tasks inside standard Web Workers to prevent blocking the WebView UI main thread:
+
+```typescript
+// worker.ts
+import { InferenceSession } from 'onnxruntime-web';
+
+addEventListener('message', async (event) => {
+  const { modelUrl, inputs } = event.data;
+  const session = await InferenceSession.create(modelUrl);
+  const results = await session.run(inputs);
+  postMessage(results);
+});
+```
 
 ---
 
-# Remote LLM Orchestration & API Security
+# Cloud LLM Gateway
 
-Mobile applications must **never** call third-party LLM providers (e.g. OpenAI, Anthropic) directly using hardcoded API keys.
+Mobile clients must **never** store third-party LLM API keys (e.g. Anthropic, OpenAI) inside front-end source files, as packages can be easily extracted from WebViews.
 
-- **Gateway Pattern**: Route all AI queries through the central **NeelStack AI Gateway (NES-218)**.
-- **Benefits**: Enforces rate limiting, token budgets, authentication verification, and prevents API key extraction from decompiled application binaries.
+- **Gateway Rule**: Route all AI queries through the central **NeelStack AI Gateway (NES-218)**.
 
 ```typescript
 import { api } from '@/lib/api';
 
 export async function askAgent(prompt: string, documentId: string): Promise<string> {
-  // Call central NeelStack AI gateway instead of third-party APIs directly
   const { data } = await api.post('/ai/agent/query', {
     prompt,
     documentId,
   });
-
   return data.answer;
 }
 ```
 
 ---
 
-# Speech Integration (STT / TTS)
+# Speech Integration (TTS / STT)
 
-For audio-enabled learning portals and accessibility support, we integrate Speech-to-Text and Text-to-Speech APIs.
+We leverage standard browser web APIs supported inside iOS and Android WebViews to handle audio operations.
 
-- **Standard (TTS)**: Use `expo-speech` for basic text translation. It accesses native iOS and Android speech synthesisers without network overhead.
-- **Standard (STT)**: For voice commands, use first-party cloud-based transcription (e.g., Whisper API via AI Gateway) to guarantee accuracy across diverse languages and accents.
+- **Text-to-Speech (TTS)**: Use standard **`window.speechSynthesis`**:
 
 ```typescript
-import * as Speech from 'expo-speech';
-
 export function speakInstructions(text: string) {
-  Speech.speak(text, {
-    language: 'en-US',
-    pitch: 1.0,
-    rate: 0.9,
-  });
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    window.speechSynthesis.speak(utterance);
+  }
+}
+```
+
+- **Speech-to-Text (STT)**: Use the Web Speech API's **`SpeechRecognition`** interface (checking for webkit prefixed instances on iOS):
+
+```typescript
+export function startVoiceRecognition(onResult: (text: string) => void) {
+  const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+
+  recognition.onresult = (event: any) => {
+    const text = event.results[0][0].transcript;
+    onResult(text);
+  };
+
+  recognition.start();
+  return recognition;
 }
 ```
 
 ---
 
-# Context Privacy & Data Security
-
-We protect user data during AI interactions.
-
-- **Context Isolation**: When sharing text context with remote LLMs, ensure all personal identifiable information (PII) is scrubbed or tokenized on the client.
-- **Local Cache**: Local AI history, vector databases (like local SQLite vector embeddings), and cached prompts must be stored in secure storage folders (`FileSystem.documentDirectory`) and deleted when the user logs out.
-
----
-
 # Anti-Patterns
 
-❌ **Hardcoded Prompt Keys**: Committing system instructions and prompt keys inside React Native files. Prompts must be versioned and served dynamically from the backend.
+❌ **Hardcoded Prompt Logic in Web Views**: Committing system instructions inside client scripts. Prompts must reside on the backend database.
 
-❌ **Running Heavy Models Local**: Attempting to run large multi-million parameter models on low-end budget smartphones, causing thermal throttling and OS crashes.
-
-❌ **Sending Unvalidated Text Blocks**: Sending huge document payloads directly from mobile storage to cloud LLMs, causing high data usage and token billing. Compress and chunk text context first.
+❌ **Sending Uncompressed Documents**: Posting raw multi-megabyte text payloads directly to remote API gateways, causing heavy data consumption.
 
 ---
 
 # Production Checklist
 
-- [ ] All API keys are removed from the client build bundle.
-- [ ] Large local models are loaded dynamically post-installation rather than embedded in the application bundle.
-- [ ] Speech permissions are declared contextually with explanatory labels.
-- [ ] Data sanitization filters run on all user-submitted text fields before gateway dispatch.
+- [ ] Private API keys are removed from the client code.
+- [ ] Large model files are loaded dynamically post-boot.
+- [ ] Speech permissions are declared with user-facing descriptions.
+- [ ] PII attributes are cleaned before sending text to external nodes.
 
 ---
 
 # Success Criteria
 
-The Mobile AI integration is successful when:
-- Voice input transcription displays response options in less than 1.5 seconds.
-- Local OCR and layout detection executes successfully without blocking screen rendering.
-- Zero raw keys are exposed inside the compiled application files.
+The Mobile AI standard is successful when:
+- Speech recognition translates voices within 1.5 seconds.
+- Local processing runs without blocking animations or inputs.
+- Telemetry logs confirm zero raw credentials leaked in bundles.
 
 ---
 

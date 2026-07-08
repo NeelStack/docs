@@ -14,17 +14,15 @@ next_document: NES-415 Mobile AI
 
 # NES-414 — Crash Reporting
 
-> **"Unreported crashes are unresolved bugs. We capture uncaught exceptions, upload sourcemaps automatically, and configure proactive error alerts."**
+> **"Unreported crashes are unresolved bugs. We capture uncaught JavaScript exceptions, native crashes, and configure automated alert reporting."**
 
 ---
 
 # Executive Summary
 
-Mobile applications can fail due to unhandled JavaScript exceptions, native thread memory out-of-bounds, library memory leaks, or network timeouts.
+Mobile applications can fail due to JavaScript runtime errors, native platform out-of-memory states, or container Webview issues.
 
-When a crash occurs on a customer's device, we cannot rely on manual bug reports. We must collect diagnostic reports automatically.
-
-This standard defines the crash logging architecture, error boundary configurations, sourcemap upload automation, and alert rules using **Sentry**.
+We automate exception capturing at both the JavaScript web bundle layer and native layers (Objective-C/Swift and Java/Kotlin) using **Sentry for Capacitor**.
 
 ---
 
@@ -32,77 +30,67 @@ This standard defines the crash logging architecture, error boundary configurati
 
 This standard defines:
 
-- Crash reporting platform selection (Sentry)
-- React Error Boundary configurations
-- Global Exception Handlers (JS and Native threads)
-- Sourcemap generation and automated uploads
-- Alerting thresholds and operational response SLA
+- Sentry configuration rules under Capacitor
+- React Error Boundary setup (Web/DOM elements)
+- Automated Sourcemaps upload using the Vite Sentry plugin
+- Operational alert SLAs
 
 ---
 
-# Tooling Standard (Sentry)
+# Tooling Standard (Sentry for Capacitor)
 
-We standardize on **Sentry** for mobile error monitoring, tracing, and exception reporting.
+We standardize on **`@sentry/capacitor`** for all mobile platforms.
 
-- **Unified SDK**: Integrate `sentry-expo` or `@sentry/react-native` to capture errors on both JS and native levels (Objective-C/Swift, Java/Kotlin).
-- **Environment Separation**: Configure Sentry tags for environment tagging (`development`, `staging`, `production`) and release versions.
-
----
-
-# Global Error Boundaries
-
-Implement a top-level React Error Boundary to catch UI-level rendering exceptions and display a fallback screen rather than letting the application crash to the device home screen.
-
-- **Standard**: Wrap the root layout in `Sentry.ErrorBoundary` or a custom component.
-- **Behavior**: Display a friendly recovery screen that allows the user to reload the app or contact support.
+- **Initialization**: Initialize the Sentry SDK inside the web application boot module (`main.tsx`):
 
 ```typescript
-import * as Sentry from '@sentry/react-native';
-import { View, Text, Button } from 'react-native';
+import * as Sentry from '@sentry/capacitor';
 
-function FallbackComponent({ error, resetError }: { error: Error; resetError: () => void }) {
-  return (
-    <View className="flex-1 items-center justify-center p-6 bg-slate-50">
-      <Text className="text-xl font-bold text-slate-900">Something went wrong</Text>
-      <Text className="mt-2 text-sm text-slate-500 text-center">{error.message}</Text>
-      <View className="mt-6 w-full max-w-xs">
-        <Button title="Reload App" onPress={resetError} />
-      </View>
-    </View>
-  );
-}
-
-export default Sentry.wrap(function AppLayout() {
-  return (
-    <Sentry.ErrorBoundary fallback={FallbackComponent}>
-      <Stack />
-    </Sentry.ErrorBoundary>
-  );
+Sentry.init({
+  dsn: 'https://xxxxxxxx@sentry.io/xxxxxx',
+  release: 'neelstack-portal-mobile@1.0.0',
+  dist: '1',
+  tracesSampleRate: 0.1,
 });
 ```
 
 ---
 
-# JS & Native Exception Handlers
+# React Error Boundaries
 
-Exceptions can occur outside the React render lifecycle (e.g. background sync threads, promise rejections, native components).
+We wrap root layout routes inside a React Error Boundary to capture rendering failures and show recovery layouts rather than letting the application crash back to the device dashboard.
 
-- **Unhandled Promise Rejections**: Configure Sentry to intercept and log unhandled rejections automatically.
-- **Native Crash Handlers**: Ensure Sentry's native hooks are initialized in `app.json` via config plugins to capture out-of-memory (OOM) failures or JVM crashes.
+- **Component Example**:
 
-```json
-{
-  "expo": {
-    "plugins": [
-      [
-        "@sentry/react-native/expo",
-        {
-          "organization": "neelstack",
-          "project": "portal-mobile"
-        }
-      ]
-    ]
-  }
+```tsx
+import * as Sentry from '@sentry/capacitor';
+import React from 'react';
+
+interface Props {
+  children: React.ReactNode;
+}
+
+export function ErrorBoundaryFallback({ error, resetError }: { error: Error; resetError: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-slate-50 text-center">
+      <h2 className="text-xl font-bold text-slate-900">Something went wrong</h2>
+      <p className="mt-2 text-sm text-slate-500 max-w-sm">{error.message}</p>
+      <button
+        onClick={resetError}
+        className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+      >
+        Reload Page
+      </button>
+    </div>
+  );
+}
+
+export function GlobalErrorBoundary({ children }: Props) {
+  return (
+    <Sentry.ErrorBoundary fallback={(props) => <ErrorBoundaryFallback {...props} />}>
+      {children}
+    </Sentry.ErrorBoundary>
+  );
 }
 ```
 
@@ -110,64 +98,66 @@ Exceptions can occur outside the React render lifecycle (e.g. background sync th
 
 # Sourcemaps Upload Automation
 
-JavaScript code is minified and obfuscated in production builds. Raw crash stacks from these builds are unreadable.
+JavaScript code is compiled and obfuscated in production. Sentry crash traces from these bundles are unreadable without map files.
 
-- **Standard**: Generate and upload JavaScript **Sourcemaps** to Sentry during EAS Build runs.
-- **Automation**: Configure EAS hooks to run Sentry sourcemap upload commands automatically:
+- **Vite Integration**: We use **`@sentry/vite-plugin`** inside `vite.config.ts` to build and upload sourcemaps automatically to the Sentry server during `npm run build`:
 
-```json
-{
-  "hooks": {
-    "postPublish": [
-      {
-        "file": "sentry-expo/upload-sourcemaps",
-        "config": {
-          "organization": "neelstack",
-          "project": "portal-mobile"
-        }
-      }
-    ]
+```typescript
+import { defineConfig } from 'vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    sentryVitePlugin({
+      org: 'neelstack',
+      project: 'portal-mobile',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
+  ],
+  build: {
+    sourcemap: true, // Required for Sentry uploads
   }
-}
+});
 ```
 
-Never commit Sentry auth tokens to public code repos. Inject them via EAS environment variables.
+- **Security**: Never commit `SENTRY_AUTH_TOKEN` inside the repository. Inject it via GitHub Actions CI pipeline secrets.
 
 ---
 
 # Anti-Patterns
 
-❌ **Catching and Swallowing Exceptions**: Writing try-catch blocks that suppress errors without forwarding them to Sentry:
+❌ **Catching Errors Silently**: Swallowing exceptions inside `try/catch` scopes without forwarding them to Sentry:
    ```typescript
-   try { ... } catch(e) { console.log(e); } // WRONG: Swallows error
+   try {
+     // API fetch
+   } catch (error) {
+     console.log(error); // AVOID
+   }
    ```
-   If an exception occurs that breaks the user flow, log it explicitly:
+   Always capture log markers for diagnostic tracking:
    ```typescript
-   Sentry.captureException(e);
+   Sentry.captureException(error);
    ```
 
-❌ **Uploading Sourcemaps Manually**: Relying on developers to upload sourcemaps from their local machines post-release. This leads to missing sourcemaps and unreadable logs.
-
-❌ **Exposing Credentials in Stack Traces**: Allowing secure passwords, authentication keys, or PII to be logged inside error payloads. Filter out sensitive values using Sentry's `beforeSend` interceptor.
+❌ **Manual Sourcemap Uploads**: Requiring developers to zip and upload map outputs manually, leading to broken stack traces.
 
 ---
 
 # Production Checklist
 
-- [ ] Sentry DSN is configured via environment variables.
-- [ ] Root layout is wrapped in the Sentry Error Boundary.
-- [ ] Sourcemap uploads are verified on release build compilations.
-- [ ] Native exception handler plugins are declared.
-- [ ] Team alert integrations (e.g., Slack, PagerDuty) are active for production crash spikes.
+- [ ] Sentry DSN configuration is injected via environment variables.
+- [ ] Root routing is wrapped inside the Global Error Boundary component.
+- [ ] Sourcemaps are verified as uploaded during the CI compilation stage.
+- [ ] Slack/Teams integrations are configured to track critical errors.
 
 ---
 
 # Success Criteria
 
-The Crash Reporting setup is successful when:
-- Unhandled crashes generate readable, de-minified stack traces pointing directly to file names and line numbers.
-- Crash events display breadcrumbs detailing user steps (navigation path, button clicks) leading to the exception.
-- Production crashes generate instant alerts for the mobile operations on-call team.
+The Crash Reporting implementation is successful when:
+- WebView exceptions generate readable traces pointing to active TypeScript filenames and line numbers.
+- Crashes log user action sequences (e.g. navigation clicks, event pushes) leading to the error.
+- Alerts dispatch immediately on production crash events.
 
 ---
 

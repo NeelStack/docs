@@ -1,7 +1,7 @@
 ---
 document_id: NES-410
 title: Mobile Performance
-subtitle: Enterprise Mobile Performance, Hermes, Rendering & Profiling Standard
+subtitle: Enterprise WebView Performance, Bundle Sizing & Virtualization Standard
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,17 @@ next_document: NES-411 Testing
 
 # NES-410 — Mobile Performance
 
-> **"Unresponsive mobile interfaces lead to uninstalled applications. We target constant 60/120 FPS rendering, rapid boot times, and low memory utilization."**
+> **"Unresponsive mobile interfaces lead to uninstalled applications. We target constant 60/120 FPS rendering inside WebViews, rapid TTI (Time to Interactive), and low memory footprint."**
 
 ---
 
 # Executive Summary
 
-Mobile applications run on varied hardware profiles, from high-end flagship phones to low-cost budget devices.
+Because Capacitor applications execute within WebView containers (System WebViews on Android, WebKit/WKWebView on iOS), performance is defined by DOM depth, asset size, JavaScript bundle optimization, and rendering efficiency.
 
-Poor performance shows up as stuttering scroll feeds, lagging animations, long app startup screens, and device overheating.
+Unoptimized layouts manifest as slow scroll response, thermal throttling, and high memory alerts.
 
-This standard outlines the configurations, coding rules, component layouts, and diagnostic profiling tools to optimize performance across both iOS and Android.
+This standard outlines rules for asset management, layout virtualizations, bundle optimizations, and diagnostic web profiling.
 
 ---
 
@@ -32,49 +32,43 @@ This standard outlines the configurations, coding rules, component layouts, and 
 
 This standard defines:
 
-- JavaScript Engine Standard (Hermes)
-- Image Caching and Rendering (Expo Image)
-- List Rendering Optimization (FlatList / FlashList)
-- Layout Computation and Rendering Optimizations
-- Performance Profiling and Monitoring Tools
+- JavaScript engine runtime profiles (V8 vs. JavaScriptCore)
+- Web bundle optimizations (Code splitting, Vite configurations)
+- Image rendering optimizations in WebViews
+- List Virtualization standards
+- Web Inspector profiling and CPU tracing
 
 ---
 
-# JavaScript Engine (Hermes)
+# Runtime Engine & Bundle Optimizations
 
-All NeelStack mobile applications must compile and run on the **Hermes JavaScript Engine**.
+We rely on native web browser engines inside the container WebView:
+- **Android**: Chromium-based V8 engine.
+- **iOS**: Apple WebKit WKWebView.
 
-- **Hermes Advantages**: Pre-compiles JS code into bytecode during the build process, reducing application startup time, lowering memory footprint, and improving CPU utilization.
-- **Rule**: Enable Hermes inside `app.json` config settings:
-
-```json
-{
-  "expo": {
-    "jsEngine": "hermes"
-  }
-}
-```
+To optimize load times, we must minimize bundle sizes and speed up JS parsing:
+- **Code Splitting**: Wrap route configurations in React lazy loading (`React.lazy`) to prevent loading all views on boot.
+- **Tree Shaking**: Configure Vite to eliminate unused exports.
+- **Asset Minification**: Utilize ESBuild (enabled by default in Vite) to compress files.
 
 ---
 
-# Image Optimization (Expo Image)
+# Image Optimization in WebViews
 
-Images are the most common source of memory bloat in mobile applications.
+WebViews have less memory headroom than native apps. Loading multiple high-resolution images will trigger memory terminations.
 
-- **Standard**: Do not use the standard React Native `Image` component. Use **`expo-image`** (powered by SDWebImage on iOS and Glide on Android).
-- **Benefits**: Cross-platform disk caching, progressive image loading, vector graphics support, and automatic performance tuning.
+1. **Format Standards**: Serve image resources in modern WebP or AVIF formats.
+2. **Lazy Loading**: Apply the standard HTML attribute `loading="lazy"` on offscreen images.
+3. **Dimensions Constraint**: Ensure image assets serve matching display dimensions (e.g. do not render a 5MB photo in a 40px avatar container).
 
-```typescript
-import { Image } from 'expo-image';
-
-export function Avatar({ url }: { url: string }) {
+```tsx
+export function UserProfile({ avatarUrl }: { avatarUrl: string }) {
   return (
-    <Image
-      source={url}
-      placeholder="blur-hash-placeholder-string"
-      contentFit="cover"
-      transition={200} // Smooth crossfade animation
-      style={{ width: 50, height: 50, borderRadius: 25 }}
+    <img
+      src={avatarUrl}
+      loading="lazy"
+      alt="User Profile"
+      className="w-10 h-10 rounded-full object-cover"
     />
   );
 }
@@ -82,92 +76,84 @@ export function Avatar({ url }: { url: string }) {
 
 ---
 
-# List Rendering (FlashList)
+# List Virtualization
 
-For rendering large feeds of data (e.g. hundreds of documents, logs, or feed updates), avoid standard `ScrollView` and `FlatList`.
+Standard list scrolls (`map` or simple lists) generate DOM elements for every array index, quickly slowing down rendering speed.
 
-- **Standard**: Use **`@shopify/flash-list`**.
-- **Performance**: FlashList recycles cell views instead of constantly creating and destroying them, preventing frame drops during quick scrolling.
+- **Standard**: For lists exceeding 100 entries, use virtualized list libraries such as **`@tanstack/react-virtual`** or **`react-window`**.
+- **Virtualization Benefits**: Renders only the items visible in the viewport, maintaining a constant DOM depth regardless of array size.
 
-### Implementation Checklist:
+```tsx
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef } from 'react';
 
-1. Specify `estimatedItemSize`: FlashList requires this property to optimize scroll physics.
-2. Avoid complex view structures inside render items. Keep children structures flat.
+export function VirtualList({ items }: { items: any[] }) {
+  const parentRef = useRef<HTMLDivElement>(null);
 
-```typescript
-import { FlashList } from '@shopify/flash-list';
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60, // Fixed or estimated height in pixels
+  });
 
-export function DocumentList({ items }: { items: Document[] }) {
   return (
-    <FlashList
-      data={items}
-      renderItem={({ item }) => <DocumentRow item={item} />}
-      estimatedItemSize={80} // Average height of rows in pixels
-    />
+    <div ref={parentRef} className="h-[400px] overflow-auto border border-slate-200 rounded">
+      <div
+        className="w-full relative"
+        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            className="absolute top-0 left-0 w-full p-4 border-b border-slate-100"
+            style={{
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            {items[virtualItem.index].title}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
-```
-
----
-
-# Component Render Optimization
-
-Prevent unnecessary re-renders that throttle the JavaScript thread:
-
-- **Memoization**: Wrap static UI layouts or complex rows in `React.memo` to prevent re-rendering when parent states shift.
-- **Reference Hooks**: Use `useCallback` for event handlers passed to children and `useMemo` for heavy data mapping operations.
-- **Batching state**: Utilize React 18 automatic batching to group multiple state transitions.
-
-```typescript
-// Memoized row component
-export const DocumentRow = React.memo(({ item }: { item: Document }) => {
-  return (
-    <View className="p-4 border-b border-slate-200">
-      <Text>{item.title}</Text>
-    </View>
-  );
-});
 ```
 
 ---
 
 # Profiling and Diagnostics
 
-Developers must profile their applications before committing major features.
+Mobile developers must profile applications using web inspectors connected to mobile emulators/devices.
 
-- **Tools**:
-  - **React DevTools Profiler**: Measure component render durations and identify unnecessary updates.
-  - **Flipper / Hermes Debugger**: Track memory allocations, identify memory leaks, and profile CPU execution patterns.
-  - **Xcode Instruments (iOS)** / **Android Studio Profiler**: Trace native CPU usage, memory leaks, and GPU render paths.
+- **Chrome DevTools (Android)**: Run `chrome://inspect` inside Google Chrome to inspect the Android WebView console, view rendering paint flashes, and trace JS execution paths.
+- **Safari Web Inspector (iOS)**: Activate Safari Develop menu to connect to iOS Simulators, analyzing memory timelines and CSS animations.
 
 ---
 
 # Anti-Patterns
 
-❌ **Anonymous Arrow Functions in JSX**: Declaring functions inline like `<Button onPress={() => doStuff()} />` inside list rendering loops. This creates new function instances on every render.
+❌ **Nesting Heavy Loops**: Writing nested loops inside component render blocks, which blocks WebView rendering frames (aim to execute logic within 16ms).
 
-❌ **Raw Unoptimized Images**: Loading massive high-res photos (e.g. 5MB raw uploads) straight into layout cards without scaling or compression.
-
-❌ **Nested ScrollViews**: Nesting scroll containers in the same direction, which breaks virtual scrolling calculations and drops frame rates.
+❌ **Using Scroll Listeners without Passive Flag**: Attaching scroll trackers to DOM elements without the `passive: true` listener configuration, which delays touch response.
 
 ---
 
 # Production Checklist
 
-- [ ] Hermes engine is verified as active in production build configurations.
-- [ ] Image assets pass through optimized image cache handlers.
-- [ ] All FlashList components have an accurate `estimatedItemSize` set.
-- [ ] Profiler runs confirm zero continuous re-renders.
-- [ ] Flipper check verifies no memory leaks exist on view transitions.
+- [ ] Route components are lazy loaded via code-splitting.
+- [ ] Large list elements use `@tanstack/react-virtual` containers.
+- [ ] Static images are scaled and served in WebP format.
+- [ ] CSS transitions use `transform` and `opacity` to invoke GPU acceleration.
 
 ---
 
 # Success Criteria
 
 The Performance standards are successful when:
-- App launch to interactive (TTI) completes in less than 2.0 seconds on mid-range devices.
-- Thread frames remain at 60 FPS (or matching refresh rate) during rapid list scrolling.
-- Memory usage profile remains stable under continuous usage (no memory leaks on navigation loop).
+- App launch to interactive (TTI) is under 1.5 seconds on mid-range devices.
+- Scroll paths maintain a steady 60 FPS (or 120 FPS on matching hardware displays).
+- WebView memory timelines remain stable without continuous growth.
 
 ---
 

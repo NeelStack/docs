@@ -20,11 +20,11 @@ next_document: NES-406 Mobile Security
 
 # Executive Summary
 
-Users expect enterprise mobile applications to remain functional in areas with poor or absent network connectivity (e.g. basements, rural fields, elevators, transport systems).
+Enterprise mobile applications must remain functional in zones with poor or absent network connectivity (e.g., basements, elevators, transit tunnels, remote areas).
 
-An application that crashes or locks up when offline is unacceptable.
+We implement an **Offline-First** model where read datasets are cached locally and write modifications are queued in a persistent transaction queue.
 
-This standard defines the architecture for local caching, mutation queueing, background synchronization, and sync conflict resolution.
+This standard establishes connectivity monitoring via the **Capacitor Network** bridge and transaction buffering using **Capacitor SQLite**.
 
 ---
 
@@ -32,80 +32,78 @@ This standard defines the architecture for local caching, mutation queueing, bac
 
 This standard defines:
 
-- Offline-First Design patterns
-- Connectivity detection using NetInfo
-- Local request queueing
-- Data synchronization pipelines
-- Conflict resolution strategies (Last-Write-Wins, Client-First, Merge)
+- Connectivity monitoring using `@capacitor/network`
+- Client state indicators for offline usage
+- Write-operation queueing (mutations buffering)
+- Retry synchronization pipelines
+- Conflict resolution strategies
 
 ---
 
-# Connectivity Detection (NetInfo)
+# Connectivity Detection (Capacitor Network)
 
-All mobile apps must monitor network state globally.
+We monitor network states globally using Capacitor's Network plugin to show status updates and control API requests.
 
-- **Library**: Use `@react-native-community/netinfo`.
-- **Global Context**: Expose network state via a provider or hook so UI components can display warning banners or disable online-only features dynamically.
+- **Library**: `@capacitor/network`.
+- **Global Store**: Expose connection state via a unified Zustand network store.
 
 ```typescript
-import NetInfo from '@react-native-community/netinfo';
+import { Network } from '@capacitor/network';
 import { create } from 'zustand';
 
 interface NetworkState {
   isConnected: boolean;
-  isInternetReachable: boolean;
-  setConnection: (connected: boolean, reachable: boolean) => void;
+  connectionType: string;
+  setConnection: (connected: boolean, type: string) => void;
 }
 
 export const useNetworkStore = create<NetworkState>((set) => ({
   isConnected: true,
-  isInternetReachable: true,
-  setConnection: (connected, reachable) => set({
-    isConnected: connected,
-    isInternetReachable: reachable
-  }),
+  connectionType: 'unknown',
+  setConnection: (connected, type) => set({ isConnected: connected, connectionType: type }),
 }));
 
-// Initialize in root layout
-NetInfo.addEventListener((state) => {
-  useNetworkStore.getState().setConnection(
-    state.isConnected ?? false,
-    state.isInternetReachable ?? false
-  );
+// Initialize listener in App entry point
+Network.addListener('networkStatusChange', (status) => {
+  useNetworkStore.getState().setConnection(status.connected, status.connectionType);
 });
+
+// Check status on startup
+async function checkInitialNetwork() {
+  const status = await Network.getStatus();
+  useNetworkStore.getState().setConnection(status.connected, status.connectionType);
+}
+checkInitialNetwork();
 ```
 
 ---
 
-# Mutation Queueing (Offline Write)
+# Mutation Queueing (Offline Writes)
 
-When a user performs an action (e.g. updates a form or submits a record) while offline, we do not throw an error. Instead, we queue the transaction locally.
+When a user submits a form or edits a record while offline, we do not show network error screens. We buffer the mutation payload in our persistent SQLite storage.
 
-- **Persistent Queue**: Write mutation payloads (endpoint, method, request body, timestamp) to local storage (SQLite or AsyncStorage).
-- **Retry Daemon**: When network connectivity is restored, trigger a sync task to drain the queue sequentially.
+- **Persistent Queue**: Write the request context (URL, HTTP Method, payload, token index, timestamp) to a database table.
+- **Sync Worker**: When the Network listener detects connection restoration, trigger the sync pipeline.
 
 ```typescript
 interface OfflineMutation {
   id: string;
   url: string;
   method: 'POST' | 'PUT' | 'DELETE';
-  body: string; // JSON payload
+  body: string; // Serialized JSON payload
   timestamp: number;
 }
 
+// Function to push to local SQLite mutation table
 export async function queueMutation(mutation: Omit<OfflineMutation, 'id' | 'timestamp'>) {
-  const newMutation: OfflineMutation = {
-    ...mutation,
-    id: uuid.v4() as string,
-    timestamp: Date.now(),
-  };
+  const id = crypto.randomUUID();
+  const timestamp = Date.now();
   
-  // Read existing queue
-  const currentQueue = await getOfflineQueue();
-  currentQueue.push(newMutation);
-  
-  // Save to persistent storage
-  await saveOfflineQueue(currentQueue);
+  // Insert query execution on local SQLite wrapper
+  await db.execute(
+    'INSERT INTO mutation_queue (id, url, method, body, timestamp) VALUES (?, ?, ?, ?, ?)',
+    [id, mutation.url, mutation.method, mutation.body, timestamp]
+  );
 }
 ```
 
@@ -113,68 +111,65 @@ export async function queueMutation(mutation: Omit<OfflineMutation, 'id' | 'time
 
 # Conflict Resolution
 
-When synchronizing cached modifications, conflicts with the server's state will occur. We define three resolution policies:
+When offline modifications sync to the server, data conflicts can arise. We define three resolution paths:
 
 ### 1. Last-Write-Wins (LWW)
-- **Policy**: The client update overwrites the server update if its timestamp is newer.
-- **Requirement**: Client and server clocks must be synchronized via NTP check offset.
+- **Policy**: The client payload overrides server data if its local timestamp is newer.
+- **Requirement**: Sync client device clock offsets via an NTP handshake on app boot.
 
 ### 2. Client-First / Server-First
-- **Policy**: Explicitly prioritize either the mobile device state or the cloud database state.
+- **Policy**: Choose one node as the absolute source of truth.
 
-### 3. User Resolution / Interstitial Merge
-- **Policy**: Prompt the user with a diff layout showing the server modifications and their local modifications, allowing them to choose which to save.
+### 3. User Resolution
+- **Policy**: Show an interactive modal detailing conflicts, allowing the user to select which version to save.
 
 ```text
-       Sync Mutation Sent
-               │
-      ┌────────┴────────┐
-      ▼                 ▼
-No Conflict      Conflict Detected
-      │                 │
-Apply Change      Apply Resolution Policy:
-                  ├── Last-Write-Wins
-                  ├── Client-First
-                  └── User Merge Selection
+        Connection Restored
+                 │
+                 ▼
+       Drain Mutation Queue
+                 │
+       ┌─────────┴─────────┐
+       ▼                   ▼
+ No Conflict        Conflict Detected
+       │                   │
+ Apply Change       Resolve using Policy:
+                    ├── Last-Write-Wins
+                    └── User Merge UI
 ```
 
 ---
 
-# Client Data Prefetching
+# Client Data Prefetching & Caching
 
-Optimize the offline experience by proactively caching pages/records.
-
-- **Prefetch Hook**: Pre-populate TanStack query cache for details views before the user taps on them (e.g., prefetch list items on list view rendering).
-- **Asset Caching**: Configure `expo-image` to aggressive-cache images locally.
+- **Query Prefetching**: Trigger TanStack Query prefetching on parent screen rendering (e.g. prefetching invoice details when rendering the list view).
+- **Service Worker / WebView Caching**: Register standard browser cache profiles for static assets (images, icons, styles) inside WebViews.
 
 ---
 
 # Anti-Patterns
 
-❌ **Blocking UI with Spinners**: Displaying block screens during sync tasks. Operations should occur in the background, showing status badges instead.
+❌ **Blocking UI with Full Spinners**: Preventing user interaction with global loading spinners during sync operations. Run sync tasks silently in the background, utilizing header indicators instead.
 
-❌ **Unlimited Retry Loops**: Attempting to send requests repeatedly without backing off, which drains mobile battery and overloads backend servers.
-
-❌ **Not Syncing in Order**: Draining the mutation queue out of order (e.g. attempting to update a resource before sending the creation request).
+❌ **Uncontrolled Sync Loops**: Attempting to drain queues repeatedly without implementing back-off intervals, which exhausts device battery and overloads backend servers.
 
 ---
 
 # Production Checklist
 
-- [ ] NetInfo listener is initialized correctly at the app entry point.
-- [ ] Offline queue is stored securely and survives app reboots.
-- [ ] Clear visual indicator (e.g., a "Syncing..." or "Offline Mode" icon) is present in the UI.
-- [ ] Back-off strategy (exponential back-off) is implemented for sync retry loops.
-- [ ] Conflict resolution tests have been run.
+- [ ] Capacitor Network listener starts at root application initialization.
+- [ ] Local mutation queue is stored securely in SQLite database.
+- [ ] Network status indicator is present in the main UI layout.
+- [ ] Sync retries use exponential back-off spacing.
 
 ---
 
 # Success Criteria
 
-The Offline design is successful when:
-- Users can create and edit resources completely offline without UI interruption.
-- The app automatically syncs queued modifications immediately when network connectivity is restored.
-- Conflicts are handled cleanly without crashing the client or corrupting the backend database.
+The Offline architecture is successful when:
+- Users can input data, edit, and navigate pages while completely disconnected.
+- Local modifications sync instantly when network connection is re-established.
+- Server conflicts are resolved without app crashes or database corruption.
 
 ---
 

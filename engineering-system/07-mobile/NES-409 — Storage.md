@@ -1,7 +1,7 @@
 ---
 document_id: NES-409
 title: Storage
-subtitle: Enterprise Mobile Storage, SQLite, AsyncStorage & Migration Standard
+subtitle: Enterprise Mobile Storage, SQLite & Preferences Standard
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,17 @@ next_document: NES-410 Mobile Performance
 
 # NES-409 — Storage
 
-> **"Data integrity requires structured local persistence. We use AsyncStorage for light key-value configs and SQLite/WatermelonDB for relational datasets."**
+> **"Data integrity requires structured local persistence. We use Capacitor Preferences for configs and Capacitor SQLite for local relational datasets."**
 
 ---
 
 # Executive Summary
 
-Mobile applications must store user profiles, app configurations, offline mutation queues, and large sets of synchronized database records.
+Mobile applications must store user profiles, app configurations, offline mutation tables, and synchronized database records.
 
-Using unstructured JSON files or flat file writers causes data corruption, blocking UI performance, and memory bloat.
+We establish two distinct local storage tiers depending on data size and relational complexity: **Key-Value Storage** (using Preferences) and **Relational Storage** (using SQLite).
 
-This standard establishes the data storage layers for NeelStack mobile apps, defining when to use key-value storage vs. relational databases, alongside migration and security rules.
+This standard defines the tools, initialization methods, schemas, and security standards for local databases.
 
 ---
 
@@ -32,63 +32,72 @@ This standard establishes the data storage layers for NeelStack mobile apps, def
 
 This standard defines:
 
-- Local Storage Tiering (Key-Value vs. Relational)
-- Key-Value Storage (AsyncStorage)
-- Relational Databases (Expo SQLite / WatermelonDB)
-- Database Migrations
-- Storage Security and Performance
+- Local storage tiering (Key-Value vs. Relational)
+- Key-Value Storage (`@capacitor/preferences`)
+- Relational Database (`@capacitor-community/sqlite`)
+- Schema migrations rules
+- Relational storage encryption (SQLCipher)
 
 ---
 
 # Local Storage Tiering
 
-We use two distinct tiers of local storage depending on dataset size and structure:
-
 | Tier | Technology | Best For | Max Size |
 |---|---|---|---|
-| **Key-Value** | `@react-native-async-storage/async-storage` | Simple configs, theme preferences, non-sensitive states. | 6MB |
-| **Relational** | `expo-sqlite` / `WatermelonDB` | Document tables, offline sync datasets, relational records. | Device Limit |
+| **Key-Value** | `@capacitor/preferences` | Simple settings, theme states, session tokens. | 6MB |
+| **Relational** | `@capacitor-community/sqlite` | Document tables, offline sync queue, relational assets. | Device Limit |
 
 ---
 
-# Key-Value Storage (AsyncStorage)
+# Key-Value Storage (Capacitor Preferences)
 
-AsyncStorage is a simple, unencrypted key-value store.
+Preferences is an asynchronous, unencrypted key-value store mapping to native system properties (`NSUserDefaults` on iOS, `SharedPreferences` on Android).
 
-- **Rule**: Never store sensitive data (e.g. access tokens, keys, PII) in AsyncStorage.
-- **Access Wrapper**: Always wrap AsyncStorage keys in a helper utility to enforce type safety.
+- **Rule**: Never write plaintext passwords or secret auth keys to Preferences (use Secure Storage).
+- **Access Wrapper**: Use a helper wrapper to maintain type-safe key indexing:
 
 ```typescript
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Preferences } from '@capacitor/preferences';
 
 type StorageKey = 'user_theme' | 'app_language' | 'has_seen_onboarding';
 
-export async function setStorageItem(key: StorageKey, value: string): Promise<void> {
-  await AsyncStorage.setItem(key, value);
+export async function setItem(key: StorageKey, value: string): Promise<void> {
+  await Preferences.set({ key, value });
 }
 
-export async function getStorageItem(key: StorageKey): Promise<string | null> {
-  return await AsyncStorage.getItem(key);
+export async function getItem(key: StorageKey): Promise<string | null> {
+  const { value } = await Preferences.get({ key });
+  return value;
 }
 ```
 
 ---
 
-# Relational Database (Expo SQLite)
+# Relational Database (Capacitor SQLite)
 
-For structured, relational data (e.g. a list of student records, certificates, and invoices), use **Expo SQLite** with SQLite engine.
+For structured local queries, we compile a local SQLite database using the `@capacitor-community/sqlite` plugin.
 
-- **Database Helper**: Use parameters in all queries to prevent SQL injection.
-- **Transaction Safety**: Always perform writes inside transactions to ensure data consistency in case of crash.
+- **Initialization**: Open and run structural schema definitions on startup.
 
 ```typescript
-import * as SQLite from 'expo-sqlite';
+import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 
-const db = SQLite.openDatabaseSync('neelstack_portal.db');
+const sqlite = new SQLiteConnection(CapacitorSQLite);
 
-export async function initializeDatabase() {
-  await db.execAsync(`
-    PRAGMA journal_mode = WAL;
+export async function initializeDatabase(): Promise<SQLiteDBConnection> {
+  // Create database connection
+  const db = await sqlite.createConnection(
+    'neelstack_portal',
+    false, // Encrypted flag (set true for SQLCipher)
+    'no-encryption',
+    1,
+    false
+  );
+
+  await db.open();
+
+  // Create tables inside transaction
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY NOT NULL,
       title TEXT NOT NULL,
@@ -96,11 +105,17 @@ export async function initializeDatabase() {
       updated_at INTEGER NOT NULL
     );
   `);
-}
 
-export async function insertDocument(doc: { id: string; title: string; status: string }) {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO documents (id, title, status, updated_at) VALUES (?, ?, ?, ?);',
+  return db;
+}
+```
+
+- **Query execution**: Use parameterized statements to prevent SQL injections:
+
+```typescript
+export async function insertDocument(db: SQLiteDBConnection, doc: { id: string; title: string; status: string }) {
+  await db.run(
+    'INSERT OR REPLACE INTO documents (id, title, status, updated_at) VALUES (?, ?, ?, ?)',
     [doc.id, doc.title, doc.status, Date.now()]
   );
 }
@@ -110,73 +125,60 @@ export async function insertDocument(doc: { id: string; title: string; status: s
 
 # Database Migrations
 
-When upgrading local schemas (e.g. adding a new column to a table), we must run safe schema migrations to avoid deleting existing user data.
+When updating local tables (e.g. adding columns during app store upgrades), we run version-controlled schemas migrations sequentially:
 
-- **Standard**: Define schema versions and execute migrations incrementally.
-- **Rule**: Never execute raw `DROP TABLE` statements on production devices unless explicitly approved by the Architecture Board.
+- **Rule**: Avoid `DROP TABLE` executions in production upgrade scopes.
+- **Migration Script**:
 
 ```typescript
-const SCHEMA_VERSION = 2;
+export async function runMigrations(db: SQLiteDBConnection) {
+  const checkVersion = await db.query('PRAGMA user_version');
+  let currentVersion = checkVersion.values?.[0]?.user_version ?? 0;
 
-export async function runMigrations() {
-  const currentVersion = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version;');
-  let version = currentVersion?.user_version ?? 0;
-
-  if (version < 1) {
-    // Initial schema
-    await db.execAsync(`
-      CREATE TABLE documents (id TEXT PRIMARY KEY, title TEXT);
-    `);
-    version = 1;
-  }
-
-  if (version < 2) {
-    // Upgrade schema
-    await db.execAsync(`
+  if (currentVersion < 2) {
+    await db.execute(`
       ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'draft';
     `);
-    version = 2;
+    currentVersion = 2;
   }
 
-  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION};`);
+  await db.execute(`PRAGMA user_version = ${currentVersion}`);
 }
 ```
 
 ---
 
-# Storage Security
+# Relational Storage Encryption (SQLCipher)
 
-For applications with high-security profiles (e.g. enterprise healthcare apps), the SQL database must be encrypted.
+For high-security compliance (e.g., healthcare credentials), the SQLite database must be encrypted.
 
-- **Standard**: Use SQLCipher (via Expo custom plugins or expo-sqlite bindings) to secure the database file using an AES-256 key generated and stored inside the iOS/Android hardware keychains.
+- **Standard**: Enable SQLite encryption using the `@capacitor-community/sqlite` SQLCipher option.
+- **Key Strategy**: Retrieve a randomly generated key from `@capacitor-community/secure-storage` on startup and pass it during database initialization.
 
 ---
 
 # Anti-Patterns
 
-❌ **Storing Large JSON Blobs**: Saving raw API payloads (larger than 100KB) under a single key in AsyncStorage, which slows down application load times due to JSON serialization bottlenecks.
+❌ **Storing Large JSON Blobs in Preferences**: Saving API list arrays (larger than 100KB) under a single key in Preferences, causing heavy serialization lags during app mount.
 
-❌ **Running DB Queries on UI Thread**: Triggering synchronous database reads inside components during UI rendering. Always fetch asynchronous using React Hooks or Zustands store integrations.
-
-❌ **Forgetting Database Indexes**: Querying large local SQLite tables (thousands of rows) without indexes on foreign keys, leading to sluggish search features.
+❌ **Running Sync Queries inside render loop**: Triggering database queries during component execution. Perform storage queries inside hooks or Zustand actions to keep rendering smooth.
 
 ---
 
 # Production Checklist
 
-- [ ] WAL journal mode is enabled for expo-sqlite to optimize read/write concurrency.
-- [ ] Database initialization and migrations run on application startup before mounting UI.
-- [ ] Error boundary handles database initialization failures.
-- [ ] Storage constraints check is implemented for large sync configurations.
+- [ ] Database initialization runs before React mounts primary UI components.
+- [ ] Database reads/writes are wrapped in error boundaries.
+- [ ] DB indexes are declared on foreign key reference columns.
 
 ---
 
 # Success Criteria
 
 The Storage implementation is successful when:
-- Local database queries complete in less than 16ms (within one frame limit).
-- Schema updates run successfully without user data loss during app store upgrades.
-- Storage memory leaks are prevented by closing query cursors and indexing databases correctly.
+- Queries execute within the 16ms render window (preventing UI pauses).
+- Relational data updates safely without data loss on app upgrades.
+- Memory leak checks verify database connections are closed on logout or app termination.
 
 ---
 

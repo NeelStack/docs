@@ -14,17 +14,15 @@ next_document: NES-407 Push Notifications
 
 # NES-406 — Mobile Security
 
-> **"Mobile devices are vulnerable to physical access and intercept threats. We protect all enterprise data at rest, in transit, and in memory."**
+> **"Mobile devices are vulnerable to physical access and intercept threats. We protect all enterprise data at rest, in transit, and in memory using industry-standard native encryption wrappers."**
 
 ---
 
 # Executive Summary
 
-Mobile applications handle sensitive client credentials, access tokens, customer databases, and proprietary business logic. 
+Capacitor applications handle sensitive user tokens, client databases, and intellectual business parameters.
 
-A compromise of a mobile device must not lead to a breach of backend databases or client data.
-
-This document establishes the mandatory security standards for data storage, network transport, biometrics, runtime environment analysis, and code integrity.
+We secure data at rest inside native keychain wrappers, enforce SSL certificate pinning to prevent Man-in-the-Middle (MITM) proxies, implement biometric unlock, inspect the runtime environment for root privileges, and obfuscate production web bundles.
 
 ---
 
@@ -32,92 +30,71 @@ This document establishes the mandatory security standards for data storage, net
 
 This standard defines:
 
-- Data at Rest Encryption (Expo SecureStore)
-- Network Transport Security (SSL Pinning)
-- Biometric Authentication Integration
-- Runtime Security (Root / Jailbreak Detection)
-- Source Code Obfuscation and Application Hardening
+- Data at Rest encryption (Secure Storage)
+- SSL Certificate Pinning for network requests
+- Biometric Authentication using Face ID / Android Biometric Prompt
+- Jailbreak and Root detection rules
+- Vite bundle obfuscation and Android ProGuard hardening
 
 ---
 
 # Data at Rest (Secure Storage)
 
-Never store plaintext credentials, JWTs, OAuth tokens, or personally identifiable information (PII) in AsyncStorage or SQLite.
+Plaintext credentials, JWTs, OAuth tokens, and personally identifiable information (PII) must never be written to unencrypted storage.
 
-- **Standard**: Use `expo-secure-store`. This API utilizes iOS Keychain services and Android Keystore system.
-- **Size Constraint**: Expo SecureStore has a value limit of 2048 bytes. For larger datasets (e.g. encrypted local SQLite database), use `expo-secure-store` to store a generated 256-bit AES encryption key, and encrypt the database file using that key.
-
-### Secure Write/Read Example:
+- **Standard**: Secure keys must be stored in the native iOS Keychain and Android Keystore.
+- **Implementation**: We use **`@capacitor-community/secure-storage`** (or a similar hardware-backed bridge).
 
 ```typescript
-import * as SecureStore from 'expo-secure-store';
+import { SecureStoragePlugin } from '@capacitor-community/secure-storage';
 
-export async function saveAuthToken(token: string) {
-  await SecureStore.setItemAsync('auth_token', token, {
-    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-  });
+export async function saveSecureToken(key: string, value: string): Promise<void> {
+  await SecureStoragePlugin.set({ key, value });
 }
 
-export async function getAuthToken(): Promise<string | null> {
-  return await SecureStore.getItemAsync('auth_token');
+export async function getSecureToken(key: string): Promise<string | null> {
+  const { value } = await SecureStoragePlugin.get({ key });
+  return value;
 }
 ```
+
+- **For SQLite**: When using relational databases, store a dynamically generated 256-bit database encryption key inside the Secure Storage keychain and open the SQLite database in encrypted mode using SQLCipher bindings.
 
 ---
 
 # Network Transport (SSL Pinning)
 
-To protect applications from Man-in-the-Middle (MITM) proxy attacks, we enforce SSL/Certificate pinning for all production API connections.
+We block interception proxies (e.g., Fiddler, Charles Proxy) by enforcing SSL certificate pinning on all production endpoints.
 
-- **Tooling**: Configure certificate pinning using `expo-build-properties` or custom config plugins.
-- **Verification**: Extract SHA-256 fingerprints from production endpoint certificates and declare them in `app.config.js`:
-
-```json
-{
-  "expo": {
-    "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "networkConfigurations": {
-              "api.neelstack.com": {
-                "publicKeyHashes": ["sha256/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx="]
-              }
-            }
-          }
-        }
-      ]
-    ]
-  }
-}
-```
+- **Tooling**: We utilize native network configurations or plugins such as `@capacitor-community/http` with certificate configurations.
+- **Platform Setup**:
+  - **Android**: Declare SHA-256 certificate hashes inside `res/xml/network_security_config.xml`.
+  - **iOS**: Declare domains and public key hashes in the `Info.plist` file under `NSAppTransportSecurity`.
 
 ---
 
 # Biometric Authentication
 
-Enterprise applications must support biometric unlock (Face ID, Touch ID, Android Biometric Prompt) for quick session reactivation.
+We support biometrics (Face ID, Touch ID, Android Biometric Prompt) for quick session unlock.
 
-- **Library**: Use `expo-local-authentication`.
-- **Implementation**: Biometrics must serve as an unlock shortcut for a locally encrypted token; it must *never* replace backend token expiration validation.
+- **Library**: `@capacitor-community/face-id`.
+- **Constraint**: Biometrics must only serve as a shortcut to read a locally encrypted token from the secure storage keychain. It must never substitute backend token validation.
 
 ```typescript
-import * as LocalAuthentication from 'expo-local-authentication';
+import { FaceId } from '@capacitor-community/face-id';
 
-export async function authenticateWithBiometrics(): Promise<boolean> {
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+export async function authenticateBiometrics(): Promise<boolean> {
+  const isAvailable = await FaceId.isAvailable();
+  if (!isAvailable.value) return false;
 
-  if (!hasHardware || !isEnrolled) return false;
-
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'Unlock NeelStack Portal',
-    fallbackLabel: 'Use PIN',
-    disableDeviceFallback: false,
-  });
-
-  return result.success;
+  try {
+    await FaceId.auth({
+      reason: 'Access your NeelStack account',
+    });
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 ```
 
@@ -125,51 +102,48 @@ export async function authenticateWithBiometrics(): Promise<boolean> {
 
 # Runtime Security & Jailbreak Detection
 
-Ensure the application is running in a secure, non-compromised environment.
+To protect enterprise workflows, the application must verify the integrity of the host OS environment.
 
-- **Detection**: Integrate jailbreak and root detection packages (e.g. `react-native-jail-monkey` or custom native modules).
-- **Rule**: If a device is detected as jailbroken/rooted:
-  - Log a security warning to the telemetry portal.
-  - Disable offline database caching.
-  - Prevent execution of high-risk business flows (e.g. financial transactions, administrator approvals).
+- **Detection**: Integrate a community-approved root/jailbreak detection plugin (e.g. `irroot` or a custom native Capacitor plugin).
+- **Security Policy**: If a compromised state is detected:
+  - Transmit a security warning log to the central telemetry database.
+  - Disable local offline databases.
+  - Disable high-risk features (e.g., administrator approvals, document signs).
 
 ---
 
-# Obfuscation and Application Hardening
+# Bundle Obfuscation and ProGuard
 
-JavaScript code compiled into React Native bundles is readable unless hardened.
+Web source files compiled in Capacitor are stored inside application asset folders. We must harden this bundle to make decompilation difficult.
 
-- **obfuscation**: Run code obfuscation as part of the EAS Build pipeline (e.g. using `javascript-obfuscator` during metro bundle builds).
-- **Android ProGuard**: Enable ProGuard rules in `eas.json` for Android builds to obfuscate compiled Java/Kotlin bytecode.
+- **Vite Obfuscation**: Integrate `javascript-obfuscator` during the Vite production compilation phase inside `vite.config.ts`.
+- **Android ProGuard**: Enable ProGuard rules inside the `/android/app/proguard-rules.pro` file to optimize and obfuscate native Java/Kotlin classes.
 
 ---
 
 # Anti-Patterns
 
-❌ **Storing Tokens in Plaintext**: Saving tokens in standard AsyncStorage, which is readable in plaintext on jailbroken or filesystem-accessed devices.
+❌ **Storing Tokens in localStorage**: Saving access keys or user PII in standard browser localStorage, which is readable in plaintext on jailbroken/compromised systems.
 
-❌ **Committing API Secrets**: Hardcoding API keys, client secrets, or private keys inside React Native components. All configs must pass through environment variables.
-
-❌ **Bypassing SSL Errors**: Disabling certificate check constraints in development and leaving the flag active in production code.
+❌ **Exposing Keys in Code**: Committing API keys or secret salts inside front-end web components. Resolve keys dynamically via environment variables injected at build time.
 
 ---
 
 # Production Checklist
 
-- [ ] Cleartext HTTP connections are completely disabled (`cleartextTrafficPermitted: false` in Android network security configuration).
-- [ ] iOS Keychain configuration has accessibility constraints set to `WHEN_UNLOCKED_THIS_DEVICE_ONLY`.
-- [ ] Certificate pinning SHA hashes are updated and verified against production domain certs.
-- [ ] Source maps are uploaded to crash reporters and removed from public bundles.
-- [ ] Jailbreak/Root checks are integrated and functional.
+- [ ] Cleartext HTTP connections are disabled in Android and iOS app configurations.
+- [ ] Certificate hashes are updated and verified for production endpoints.
+- [ ] Obfuscator plugin is enabled in the Vite production build chain.
+- [ ] Keychain items are marked as device-locked (accessible only when device is unlocked).
 
 ---
 
 # Success Criteria
 
-The Security design is successful when:
-- The app refuses to boot or function on jailbroken/compromised devices if enterprise security flags are set.
-- Intercepting APIs with tools like Charles Proxy or Fiddler fails due to SSL pinning constraints.
-- Sensitive access keys are stored encrypted within hardware keychains.
+The Security implementation is successful when:
+- Sensitive variables remain encrypted in native hardware containers.
+- Intercepting HTTP endpoints fails unless using a valid, pinned certificate.
+- The app flags jailbroken environments and executes corresponding security actions.
 
 ---
 

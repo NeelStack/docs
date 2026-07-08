@@ -14,17 +14,15 @@ next_document: NES-414 Crash Reporting
 
 # NES-413 — Analytics
 
-> **"Product decisions require data evidence. We implement type-safe, user-consented behavioral tracking across all mobile applications."**
+> **"Product decisions require data evidence. We implement type-safe, user-consented telemetry tracking across all mobile applications."**
 
 ---
 
 # Executive Summary
 
-To improve our products, optimize user journeys, and identify usability bottlenecks, we must capture user actions and interface performance data.
+To optimize user pathways and identify rendering errors, our mobile applications capture client-side events.
 
-However, unregulated analytics leads to app store rejections (due to privacy violations), UI performance lags, and inconsistent event schemas.
-
-This standard establishes the mobile analytics lifecycle, tracking consent compliance (App Tracking Transparency - ATT), event naming structures, and toolsets.
+To comply with App Store privacy laws, we request permissions contextually and integrate telemetry wrappers that buffer data, minimizing performance overhead in our WebView.
 
 ---
 
@@ -32,141 +30,116 @@ This standard establishes the mobile analytics lifecycle, tracking consent compl
 
 This standard defines:
 
-- Privacy Compliance & ATT Consent (iOS/Android rules)
-- Analytics Integration Tooling (Segment / Firebase)
-- Event Naming Schemes and Payload Typings
-- Session and Identity Tracking
-- Performance Impact Optimizations
+- Privacy compliance and tracking permission checks (ATT)
+- Telemetry integrations via Firebase or Segment
+- Event naming conventions and typing schemas
+- Performance footprint optimizations
 
 ---
 
 # Privacy and User Consent (ATT)
 
-Apple and Google enforce strict user privacy controls.
+Apple and Google enforce strict user tracking regulations.
 
-- **iOS App Tracking Transparency (ATT)**: On iOS, if you collect IDFA (Identifier for Advertisers) or track users across external apps, you must display the ATT prompt.
-- **Rule**: Minimize tracking scope to avoid displaying the ATT prompt where possible. If tracking is required, request permission contextually.
+- **iOS App Tracking Transparency (ATT)**: If the application tracks user behaviors, you must display the ATT prompt.
+- **Library**: `capacitor-plugin-app-tracking-transparency` (or custom native plugin).
 
 ```typescript
-import * as Device from 'expo-device';
-import { requestTrackingPermissionsAsync, getTrackingPermissionsAsync } from 'expo-tracking-transparency';
+import { AppTrackingTransparency } from 'capacitor-plugin-app-tracking-transparency';
 
-export async function checkTrackingConsent() {
-  const { status } = await getTrackingPermissionsAsync();
-  if (status === 'undetermined') {
-    // Request tracking permission
-    const { status: newStatus } = await requestTrackingPermissionsAsync();
-    return newStatus === 'granted';
+export async function requestTrackingConsent(): Promise<boolean> {
+  const statusRes = await AppTrackingTransparency.getStatus();
+  
+  if (statusRes.status === 'unrequested') {
+    const requestRes = await AppTrackingTransparency.requestPermission();
+    return requestRes.status === 'authorized';
   }
-  return status === 'granted';
+  
+  return statusRes.status === 'authorized';
 }
 ```
 
+- **iOS setup**: Declare `NSUserTrackingUsageDescription` inside `Info.plist`.
+
 ---
 
-# Tooling Standards
+# Analytics Integration (Firebase Analytics)
 
-We standardize on a single wrapper interface connected to our backend data platform or **Segment / Firebase Analytics** SDKs.
+We standardize on **`@capacitor-community/firebase-analytics`** for device behavioral logs.
 
-- Avoid importing analytics functions directly into layout files. Implement a centralized telemetry service.
+- **Standard Wrapper**: All tracking calls must flow through a unified service class instead of calling SDK methods directly inside views.
 
 ```typescript
-// Centralized Telemetry Wrapper
+import { FirebaseAnalytics } from '@capacitor-community/firebase-analytics';
+
 export const TelemetryService = {
-  identify: (userId: string, traits: Record<string, any>) => {
-    // Log user identity to backend analytics
-  },
-  
-  track: (eventName: string, properties?: Record<string, any>) => {
-    // Dispatch event payload
+  identify: async (userId: string, traits: Record<string, any>) => {
+    await FirebaseAnalytics.setUserId({ userId });
+    await FirebaseAnalytics.setUserProperty({ name: 'traits', value: JSON.stringify(traits) });
   },
 
-  screen: (screenName: string) => {
-    // Log page view
+  track: async (eventName: string, params?: Record<string, any>) => {
+    await FirebaseAnalytics.logEvent({ name: eventName, params });
+  },
+
+  screen: async (screenName: string) => {
+    await FirebaseAnalytics.setScreenName({ screenName });
   }
 };
 ```
 
 ---
 
-# Event Naming Conventions
+# Event Naming Standards
 
-To prevent analytics pollution, all event names must follow a strict **Object-Action** naming scheme using uppercase letters:
+We enforce a strict **Object-Action** structure utilizing UPPERCASE formatting:
 
-- **Auth**: `USER_LOGIN`, `USER_LOGOUT`
-- **Actions**: `DOCUMENT_DOWNLOAD`, `CERTIFICATE_UPLOAD`
-- **Errors**: `API_CONNECTION_FAIL`, `BIOMETRIC_ERROR`
+- `USER_LOGIN`
+- `DOCUMENT_DOWNLOAD`
+- `BIOMETRIC_ERROR`
 
-### Payload Schema Typing:
-
-Every tracked event must be typed to ensure that product managers receive predictable variables.
-
+### Event Typings:
 ```typescript
 interface EventMap {
   DOCUMENT_DOWNLOAD: {
     documentId: string;
-    documentType: string;
     fileSizeKb: number;
   };
   USER_LOGIN: {
-    authMethod: 'password' | 'biometric' | 'sso';
+    authMethod: 'password' | 'biometrics';
   };
 }
 
-export function trackEvent<K extends keyof EventMap>(
-  event: K,
-  properties: EventMap[K]
-) {
-  TelemetryService.track(event, properties);
+export async function trackEvent<K extends keyof EventMap>(event: K, properties: EventMap[K]) {
+  await TelemetryService.track(event, properties);
 }
 ```
 
 ---
 
-# Session & User Identity Tracking
-
-Associate analytics events with a unique, encrypted ID once the user is authenticated.
-
-- **Rule**: Never pass raw passwords, credit cards, or personal PII keys (phone, email) as custom traits in identify calls.
-- **Clear on Logout**: Clear the identity and session data in the telemetry service immediately when the user logs out to prevent cross-account session pollution.
-
----
-
-# Performance Impact Optimization
-
-Analytics dispatches require network resources.
-
-- **Batching**: Configure analytics clients to buffer event queues locally and send batches every 30 seconds or when the queue hits 20 events.
-- **Thread Priority**: Run telemetry dispatches off the primary JS thread execution path.
-
----
-
 # Anti-Patterns
 
-❌ **Tracking Sensitive Key Presses**: Capturing letters typed in secure input fields (e.g. passwords, pins, credit card numbers).
+❌ **Hardcoded PII Logging**: Transmitting customer emails, passwords, or credit card inputs inside analytics payloads, leading to store blockages and security audits.
 
-❌ **Freeform String Event Names**: Creating arbitrary events like `tapped_submit_button_new` or `user_clicked_here`, which breaks analytics dashboards.
-
-❌ **Over-tracking Screens**: Logging page views on simple tab switches or modal scrolls, leading to excessive network requests and distorted engagement data.
+❌ **Freeform Event String Labels**: Creating descriptive names like `clicked_red_button_final_v2` which corrupt analytical reporting dashboards.
 
 ---
 
 # Production Checklist
 
-- [ ] Privacy Policy documents list all third-party analytics SDKs.
-- [ ] ATT permission key is configured in Info.plist (`NSUserTrackingUsageDescription`).
-- [ ] Centralized telemetry service is verified as working on test builds.
-- [ ] Event dispatch is verified as disabled in development environments.
-- [ ] Session cleanup is triggered on logout actions.
+- [ ] Privacy Policy documents specify analytics SDK dependencies.
+- [ ] ATT permission keys are declared in native configs.
+- [ ] Analytics logs are disabled in development environments.
+- [ ] Identity profiles are cleared on user logout.
 
 ---
 
 # Success Criteria
 
-The Analytics configuration is successful when:
-- Product dashboards receive consistent, type-safe events.
-- App store submissions pass privacy compliance reviews on the first attempt.
-- The analytics SDK consumes less than 1% of mobile processor cycles under continuous usage.
+The Analytics setup is successful when:
+- Native apps pass iOS App Store privacy reviews.
+- Analytics execution tracks less than 1% CPU utilization in our WebView profile.
+- Event names align to uppercase schemas automatically via type validation checks.
 
 ---
 

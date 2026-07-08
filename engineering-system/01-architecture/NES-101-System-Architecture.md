@@ -23,7 +23,7 @@ This document presents the authoritative, finalized system architecture and tech
 ```text
                             ┌─────────────────────────┐
                             │   Next.js Web Console   │
-                            │  / Vite Mobile Client   │
+                            │/ Capacitor Mobile Client│
                             └────────────┬────────────┘
                                          │
                                          ▼

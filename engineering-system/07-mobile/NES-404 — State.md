@@ -14,17 +14,17 @@ next_document: NES-405 Offline Architecture
 
 # NES-404 — State
 
-> **"State management must separate client and server state. We use Zustand for UI/client state and TanStack Query for cache orchestration."**
+> **"State management must separate client and server state. We use Zustand for local client states and TanStack Query for server cache synchronization."**
 
 ---
 
 # Executive Summary
 
-Mobile applications must handle UI states, session data, user profiles, backend caches, and offline synchronization. 
+Mobile applications require robust state management to handle user sessions, client configurations, offline write queues, and cached database records.
 
-Unstructured state propagation causes memory leaks, high render counts, stale displays, and inconsistent user flows.
+We isolate Client UI state from Server state. We use **Zustand** for local interface states and **TanStack Query** for background caching.
 
-This standard establishes the data lifecycle flow for mobile, dividing state into **Client State** and **Server State** with clear cache policies.
+Additionally, to persist crucial state nodes (like login profiles and configurations) across app restarts, we configure Zustand with a storage adapter wrapping the **Capacitor Preferences** API.
 
 ---
 
@@ -32,24 +32,22 @@ This standard establishes the data lifecycle flow for mobile, dividing state int
 
 This standard defines:
 
-- Client State Management (Zustand)
-- Server Cache Management (TanStack Query)
-- Store Isolation and Lifecycle
-- Async State & Optimization (Selectors)
-- Persisted States & Hydration
+- Client UI State configuration via Zustand
+- Server State caching via TanStack Query
+- Persistence configuration using `@capacitor/preferences`
+- Selector performance rules
+- Async state hydration processes
 
 ---
 
 # Client State (Zustand)
 
-We use **Zustand** as the lightweight manager for local UI state, user sessions, theme preferences, and transient states.
+Zustand provides a lightweight, hook-based state container.
 
-### Standard rules:
-- **Small, Focused Stores**: Avoid single giant states. Keep stores isolated by domain (e.g. `useAuthStore`, `useSettingsStore`).
-- **Use Selectors**: Always use selectors when consuming states to prevent unnecessary re-rendering.
+- **Store Isolation**: Keep stores small and focused on single domains (e.g., `useSessionStore`, `useThemeStore`).
+- **Render Selectors**: Access store nodes using selectors to prevent components from re-rendering on unrelated state modifications.
 
 ### Store Example:
-
 ```typescript
 import { create } from 'zustand';
 
@@ -70,10 +68,9 @@ export const useSessionStore = create<SessionState>((set) => ({
 }));
 ```
 
-### Component Selector Consumption:
-
-```typescript
-// Correct: Only re-renders if isAuthenticated changes
+### Hook Consumption (With Selectors):
+```tsx
+// Correct: Re-renders ONLY when isAuthenticated changes
 const isAuthenticated = useSessionStore((state) => state.isAuthenticated);
 ```
 
@@ -81,16 +78,14 @@ const isAuthenticated = useSessionStore((state) => state.isAuthenticated);
 
 # Server State (TanStack Query)
 
-We use **TanStack Query (React Query) v5+** to manage server caching, loading states, retry logic, and background synchronization.
+We use **TanStack Query (React Query) v5+** to coordinate backend API caching, pagination, load indicators, and server modifications.
 
-### Standard configurations:
-- **Global Defaults**:
-  - `staleTime`: 5 minutes (default cache lifetime before re-querying in the background).
-  - `gcTime`: 15 minutes (garbage collection window for unused query nodes).
-- **Custom Hooks**: Wrap every endpoint fetch in a custom query hook.
+- **Configuration Defaults**:
+  - `staleTime`: 5 minutes.
+  - `gcTime` (Garbage Collection): 15 minutes.
+- **Hook Isolation**: Wrap all endpoint requests inside custom hooks.
 
-### Hook Example:
-
+### Custom Query Hook Example:
 ```typescript
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -119,25 +114,44 @@ export function useDocuments() {
 
 # Store Persistence & Hydration
 
-Selected client states must persist across app reboots (e.g., login tokens, user preferences).
+To save selected user configurations across app closures, configure Zustand's `persist` middleware with the native **Capacitor Preferences** storage engine.
 
-- **Storage Engine**: Configure Zustand with `persist` middleware using a custom wrapper around `expo-secure-store` or `async-storage`.
-- **Hydration Safety**: Because state hydration runs asynchronously on app startup, ensure components display a loader until hydration completes:
+- **Preferences Bridge**: Capacitor Preferences utilizes native iOS `UserDefaults` and Android `SharedPreferences`.
+- **Storage Adapter**: Write a wrapper conforming to Zustand's `StateStorage` contract:
 
 ```typescript
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import { Preferences } from '@capacitor/preferences';
+
+// Adapt Capacitor Preferences to Zustand StateStorage signature
+const capacitorStorage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    const { value } = await Preferences.get({ key: name });
+    return value;
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    await Preferences.set({ key: name, value });
+  },
+  removeItem: async (name: string): Promise<void> => {
+    await Preferences.remove({ key: name });
+  },
+};
+
+interface SettingsState {
+  notificationsEnabled: boolean;
+  setNotifications: (enabled: boolean) => void;
+}
 
 export const useSettingsStore = create()(
   persist(
     (set) => ({
       notificationsEnabled: true,
-      setNotifications: (enabled: boolean) => set({ notificationsEnabled: enabled }),
+      setNotifications: (enabled) => set({ notificationsEnabled: enabled }),
     }),
     {
       name: 'settings-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => capacitorStorage),
     }
   )
 );
@@ -145,42 +159,29 @@ export const useSettingsStore = create()(
 
 ---
 
-# Cache Invalidation & Mutations
-
-When modifying backend resources, immediately update or invalidate related queries.
-
-- **Query Invalidation**: Use `queryClient.invalidateQueries` inside mutation success handlers.
-- **Optimistic Updates**: For critical actions (e.g. archiving a document), perform optimistic UI updates to ensure the interface responds instantly, rolling back on failure.
-
----
-
 # Anti-Patterns
 
-❌ **Mixing State Types**: Storing backend server responses in a Zustand client store. This creates duplicate caches and causes sync issues.
+❌ **Storing API Results in Zustand**: Duplicating backend API data inside local client stores. Use TanStack Query's cache pool instead.
 
-❌ **Missing Selectors**: De-structuring states directly like `const { userId, token } = useSessionStore()`, which forces the component to re-render on *any* property change in that store.
-
-❌ **Blocking App Mounting**: Blocking the app from loading while fetching non-essential configurations. Use loaders or screen splash flags until core hydration finishes.
+❌ **Bypassing Selectors**: Calling store variables via destructuring (`const { token } = useSessionStore()`), causing unnecessary component re-renders when other attributes change.
 
 ---
 
 # Production Checklist
 
-- [ ] All Zustand persistent stores have a defined `storage` configuration.
-- [ ] Selectors are used on every single state hook call.
-- [ ] TanStack Query keys are configured as arrays with dynamic parameters (e.g. `['documents', id]`).
-- [ ] Mutation error cases have user-facing warning banners.
-- [ ] Garbage collection times are checked to prevent memory leaks on low-end devices.
+- [ ] Persistent stores use the custom `capacitorStorage` adapter.
+- [ ] Selectors are declared on all Zustand hook invocations.
+- [ ] Query keys are array structured with dynamic parameters (e.g. `['document', id]`).
+- [ ] Load and error states are handled in all screens consuming TanStack query hooks.
 
 ---
 
 # Success Criteria
 
-The State setup is successful when:
-- App state is consistent when backgrounding and resuming the app.
-- Component render counts remain low during rapid state changes.
-- Stored session states are decrypted and loaded safely on startup.
-- Backend responses are fetched once and shared across screens automatically.
+The State implementation is successful when:
+- App states survive backgrounding and native application restarts.
+- Consuming screens trigger low component render counts.
+- Server data fetches once and is cached efficiently across client paths.
 
 ---
 

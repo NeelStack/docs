@@ -1,7 +1,7 @@
 ---
 document_id: NES-407
 title: Push Notifications
-subtitle: Enterprise APNs, FCM & Expo Notifications Standard
+subtitle: Enterprise APNs, FCM & Capacitor Push Standards
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,17 @@ next_document: NES-408 Background Sync
 
 # NES-407 — Push Notifications
 
-> **"Push notifications re-engage users. We implement a secure, low-latency notification delivery channel using APNs, FCM, and Expo."**
+> **"Push notifications re-engage users. We implement a secure, low-latency notification delivery channel using APNs, FCM, and Capacitor native handlers."**
 
 ---
 
 # Executive Summary
 
-Mobile push notifications require complex native registrations, credential exchanges, and platform-specific background handlers.
+Mobile push notifications require native platform registrations, credential exchanges, and platform-specific background receiver hooks.
 
-This standard defines the registration architecture, payload schemas, permission guidelines, and background interceptors for iOS and Android devices.
+We standardize on **`@capacitor/push-notifications`** to coordinate device registration and trigger push receivers inside our hybrid web application.
 
-We utilize the **Expo Notifications** system integrated with Apple Push Notification service (APNs) and Firebase Cloud Messaging (FCM).
+Our backend coordinates notification deliveries using Apple Push Notification service (APNs) for iOS and Firebase Cloud Messaging (FCM) for Android.
 
 ---
 
@@ -32,11 +32,11 @@ We utilize the **Expo Notifications** system integrated with Apple Push Notifica
 
 This standard defines:
 
-- Device token registration lifecycle
-- APNs and FCM credential configurations
-- Push notification permission request standard
-- Foreground and background notification handlers
-- Notification payload security rules
+- Native Device Token registration lifecycle
+- APNs and FCM setup
+- Permission request flow rules
+- Foreground and background notification tap handling
+- Payload security schemas
 
 ---
 
@@ -57,113 +57,99 @@ This standard defines:
       Target Device (iOS/Android)
              │
              ▼
-     Expo Notifications
+  Capacitor Push Notifications
 ```
 
 ---
 
-# Token Registration Lifecycle
+# Device Registration Lifecycle
 
-On application mount (or post-login), retrieve the device push token and upload it to the NeelStack Backend Database.
+Register the device on app startup or post-login, retrieving the registration token and transmitting it to the NeelStack Backend Database.
 
-- **Unique Identifier**: Generate a unique token representing the device/user combination.
-- **Refresh Policy**: Refresh and upload the token on every app startup, as OS tokens change after system updates or reinstalls.
+- **Library**: `@capacitor/push-notifications`.
+- **Implementation**: Request permissions and register listeners:
 
 ```typescript
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { PushNotifications, Token } from '@capacitor/push-notifications';
+import { api } from '@/lib/api';
 
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  if (!Constants.easConfig?.projectId) {
-    throw new Error('EAS Project ID not found');
+export async function registerPushNotifications() {
+  let permStatus = await PushNotifications.checkPermissions();
+
+  if (permStatus.receive === 'prompt') {
+    permStatus = await PushNotifications.requestPermissions();
   }
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
+  if (permStatus.receive !== 'granted') {
+    return null; // User denied permissions
   }
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
+  // Register with Apple/Google push services
+  await PushNotifications.register();
 
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    return null; // Permission denied
-  }
-
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: Constants.easConfig.projectId,
+  // Listeners
+  PushNotifications.addListener('registration', async (token: Token) => {
+    // Send token to backend API
+    await api.post('/device/register', { token: token.value });
   });
 
-  return tokenData.data;
+  PushNotifications.addListener('registrationError', (error: any) => {
+    console.error('Push registration error: ', error);
+  });
 }
 ```
 
 ---
 
-# Notification Handlers
+# Foreground & Background Interaction Handlers
 
-Configure how the app responds when a notification is received in different states.
+Manage how the application handles incoming messages when active, or when a user taps a notification banner to launch the app.
 
-- **Foreground**: Determine if the notification displays an alert or executes logic silently when the app is active.
-- **Background/Killed**: Intercept taps on the notification banner to launch the app and navigate to a target deep link.
+- **Foreground**: Capture notifications dynamically without necessarily throwing an alert:
 
 ```typescript
 import { useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
+import { useNavigate } from 'react-router-dom';
+import { PushNotifications, ActionPerformed } from '@capacitor/push-notifications';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldMutateBadge: true,
-  }),
-});
-
-export function useNotificationNavigation() {
-  const router = useRouter();
+export function usePushNotificationRouter() {
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Listener for taps on notifications
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      if (data?.deepLink) {
-        router.push(data.deepLink);
+    // Triggered when a notification action (tap) is performed
+    const actionListener = PushNotifications.addListener(
+      'pushNotificationActionPerformed',
+      (action: ActionPerformed) => {
+        const data = action.notification.data;
+        if (data?.deepLink) {
+          navigate(data.deepLink);
+        }
       }
-    });
+    );
 
-    return () => subscription.remove();
-  }, []);
+    return () => {
+      actionListener.then(h => h.remove());
+    };
+  }, [navigate]);
 }
 ```
 
 ---
 
-# Notification Payload Schema
+# Payload Security Standards
 
-To maintain consistency and secure data routing, all push payloads must follow a unified JSON schema.
+To meet privacy standards, notification payloads must never contain raw client records or PII (e.g., student names, grades).
 
-- **Rule**: Never pass sensitive raw data in push notifications. Only pass resource IDs and force the client to fetch data securely after token validation.
+- **Payload Schema**: Only transmit resource IDs and route names. Force the client to pull records via authenticated, secure APIs post-launch.
 
 ```json
 {
-  "to": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
-  "title": "Document Approved",
-  "body": "Your student certificate has been approved by the admin.",
+  "title": "Document Verification Completed",
+  "body": "A new status update has been registered on your file.",
   "data": {
-    "deepLink": "/document/987",
-    "resourceId": "987",
-    "category": "DOCUMENT_UPDATE"
+    "deepLink": "/app/document/489f-8fb2",
+    "resourceId": "489f-8fb2",
+    "category": "DOCUMENT_STATUS"
   }
 }
 ```
@@ -172,30 +158,27 @@ To maintain consistency and secure data routing, all push payloads must follow a
 
 # Anti-Patterns
 
-❌ **Intrusive Spamming**: Triggering multiple notifications daily without user configuration settings.
+❌ **Registering on Boot Unconditionally**: Triggering the iOS push notification consent dialog immediately on first boot. Delay registration prompts until the user has authenticated or activated a feature requiring alerts.
 
-❌ **Forcing Permission on Boot**: Triggering the iOS permission dialog immediately upon the first app launch. Request permission only when the user performs an action that requires notifications (e.g. enabling alerts for a document).
-
-❌ **Logging Plaintext in Payloads**: Including customer names, healthcare details, or personal emails directly in the push text, where it displays on public lockscreens.
+❌ **Raw PII in Notification Text**: Writing sensitive patient or customer names inside push titles, where they display on public lock screens.
 
 ---
 
 # Production Checklist
 
-- [ ] APNs Key (.p8 file) is uploaded and configured in Apple Developer Portal and EAS Credentials.
-- [ ] FCM Service Account credentials are uploaded to the EAS Dashboard.
-- [ ] Notification categories and channels (Android) are declared.
-- [ ] Deep linking logic is verified for cold start launches.
-- [ ] User notification preference settings are saved to the backend database.
+- [ ] APNs distribution certificates are validated in the Apple Developer Portal.
+- [ ] Firebase credentials are set inside the `/android/app/google-services.json` file.
+- [ ] Registration tokens are refreshed on every app launch to handle OS-driven rotations.
+- [ ] Custom action paths resolve to active React Router routes.
 
 ---
 
 # Success Criteria
 
-The Push Notification configuration is successful when:
-- Users receive notifications within 5 seconds of backend payload trigger.
-- Tapping a notification opens the app and routes immediately to the target resource.
-- Permissions are requested contextually and decline cases are handled gracefully.
+The Push Notification standard is successful when:
+- Device push registrations compile and generate registration tokens on iOS and Android emulators.
+- Tapping a push notification banner opens the app and routes directly to the referenced record.
+- Notifications arrive on active test devices within 5 seconds of backend dispatch.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 document_id: NES-403
 title: Mobile Design System
-subtitle: Enterprise Mobile Tokens, Typography & NativeWind Style Guide
+subtitle: Enterprise Web Standards, Safe-Areas & Tailwind CSS Style Guide
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,15 @@ next_document: NES-404 State
 
 # NES-403 — Mobile Design System
 
-> **"Consistent design breeds professional products. We build a unified, high-performance styling system using design tokens and utility classes."**
+> **"A unified styling system maximizes UI reuse. We design our Capacitor mobile views using standard Tailwind CSS and semantic HTML, ensuring fluid responsive layouts and secure notch safe areas."**
 
 ---
 
 # Executive Summary
 
-A consistent look and feel across our mobile applications is key to the NeelStack brand identity.
+Because Capacitor compiles web assets into native WebViews, we have no need for complex native styling wrappers like NativeWind. We write standard, clean HTML5 and styled Tailwind CSS code.
 
-This standard establishes the design system rules, colors, fonts, spacing tokens, and component guidelines for mobile. 
-
-We standardize on **NativeWind** (Tailwind CSS for React Native) to align our mobile styling with our Next.js frontend web applications.
+This standard outlines spacing tokens, custom safe areas for modern screens (notches, status bars), typography scales, dynamic dark mode, and responsive layout guidelines for our hybrid mobile applications.
 
 ---
 
@@ -32,83 +30,90 @@ We standardize on **NativeWind** (Tailwind CSS for React Native) to align our mo
 
 This standard defines:
 
-- Styling Toolchain (NativeWind)
-- Design Tokens (Color Palette, Typography, Spacing, Shadows)
-- Dark Mode Architecture
-- Component styling principles
-- Adaptive Layout Guidelines
+- Styling toolchain (Tailwind CSS v3 web integration)
+- Notch and device safe areas configuration
+- Dark Mode styling setup
+- Typography tokens
+- Multi-device layout standards
 
 ---
 
-# Styling Toolchain (NativeWind)
+# Styling Toolchain (Tailwind CSS)
 
-We use **NativeWind v4+** to compile Tailwind CSS styles directly into Native StyleSheets at build time.
+We use standard **Tailwind CSS v3** in our mobile React applications.
 
-- **Unified Configuration**: The `tailwind.config.js` is shared or mirrored from the Web Design System to ensure identical theme tokens.
-- **Rule**: Avoid inline `style={{ ... }}` objects for anything other than dynamic calculations (like coordinates from animations or gesture trackers).
+- **Unified Configuration**: Mirror the web design system configuration inside `tailwind.config.js` to ensure uniform colors, borders, and margins.
+- **Rules**:
+  - Avoid inline styles (`style={{ ... }}`) unless rendering dynamic, runtime-calculated properties (e.g., card gestures, drag-and-drop coordinates).
+  - Use standard HTML tags (`div`, `header`, `main`, `section`, `span`, `button`).
 
-### Styling Example:
-
-```typescript
+### Component Example:
+```tsx
 export function Card({ title, description }: { title: string; description: string }) {
   return (
-    <View className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-      <Text className="text-lg font-semibold text-slate-900 dark:text-white">
+    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
         {title}
-      </Text>
-      <Text className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      </h3>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         {description}
-      </Text>
-    </View>
+      </p>
+    </div>
   );
 }
 ```
 
 ---
 
-# Design Tokens
+# Notch & Device Safe Areas
 
-## Spacing & Layout
+Mobile devices have camera notches, status bars, and bottom gesture home bars. Web content must not bleed under these areas.
 
-Spacing must follow a strict **8px grid system** (e.g. `2px`, `4px`, `8px`, `16px`, `24px`, `32px`, `48px`, `64px`).
+- **CSS Environment Variables**: Use standard CSS environment variables.
+- **Utility Setup**: Define custom padding classes inside `src/index.css`:
 
-- Tailwind equivalents: `p-1` (4px), `p-2` (8px), `p-4` (16px), `p-6` (24px), `p-8` (32px).
-- Use `gap` settings in `Flex` containers to space children instead of applying margins to each child.
+```css
+/* In index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-## Color Palette
+@layer utilities {
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-height {
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+```
 
-Colors match the NeelStack branding guidelines:
-
-| Name | Light Hex | Dark Hex | Tailwind Class |
-|---|---|---|---|
-| Primary | `#0284C7` (Sky-600) | `#38BDF8` (Sky-400) | `bg-sky-600` / `dark:bg-sky-400` |
-| Slate Base | `#0F172A` (Slate-900) | `#F8FAFC` (Slate-50) | `text-slate-900` / `dark:text-slate-50` |
-| Background | `#F8FAFC` (Slate-50) | `#020617` (Slate-950) | `bg-slate-50` / `dark:bg-slate-950` |
-| Surface | `#FFFFFF` | `#0F172A` (Slate-900) | `bg-white` / `dark:bg-slate-900` |
-| Border | `#E2E8F0` (Slate-200) | `#1E293B` (Slate-800) | `border-slate-200` / `dark:border-slate-800` |
+- **Usage**: Apply `.safe-top` to headers and `.safe-bottom` to bottom tab navigation bars or screen footers.
 
 ---
 
 # Dark Mode Architecture
 
-Mobile applications must support both Light and Dark modes.
+Our mobile applications inherit light/dark configurations from standard media queries or class selections:
 
-- **Theme Engine**: Configure NativeWind using the `class` output system.
-- **Provider Hook**: Use Expo's `useColorScheme` to track the OS-level theme preference.
-- **Root Injection**: Set color scheme in `app/_layout.tsx`:
+- **Theme Engine**: Configure Tailwind CSS with the `class` selector option inside `tailwind.config.js`.
+- **System Sync**: Check system themes or user session preferences and apply the `dark` class to the `<html>` root node:
 
 ```typescript
-import { useColorScheme } from 'react-native';
-import { ThemeProvider, DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { useEffect } from 'react';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack />
-    </ThemeProvider>
-  );
+export function useThemeSync() {
+  useEffect(() => {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
 }
 ```
 
@@ -116,10 +121,7 @@ export default function RootLayout() {
 
 # Typography Standards
 
-Avoid using system font configurations directly. Define typography scales inside the tailwind settings.
-
-- **Primary Font**: `Inter` (integrated via Expo Google Fonts).
-- **Fallback**: System sans-serif.
+We use standard typography classes bound to the Inter Google font.
 
 | Style | Size | Weight | Tailwind Class |
 |---|---|---|---|
@@ -133,26 +135,20 @@ Avoid using system font configurations directly. Define typography scales inside
 
 # Adaptive & Responsive Layouts
 
-Mobile devices come in varying screen sizes. Layouts must be dynamic.
+To adapt layouts across phone and tablet WebView environments:
 
-- **Flexbox**: Always use flex-based dimensions rather than fixed layouts.
-- **Percentage Bounds**: Use percentage-based width bounds for modular sub-components.
-- **Device Checks**: Use `useWindowDimensions()` to construct column layouts:
+- **Viewport Sizing**: Enforce dynamic viewport heights (`dvh`, `lvh`) instead of standard `vh` to prevent mobile address bar/keyboard sizing mismatches.
+- **Flex and Grid**: Leverage Tailwind Flexbox and Grid layouts to align columns and scale tables dynamically.
+- **Media Queries**: Utilize responsive breakpoints (`md:`, `lg:`) to display multi-column grids on tablets.
 
-```typescript
-import { useWindowDimensions } from 'react-native';
-
-export function GridList() {
-  const { width } = useWindowDimensions();
-  const numColumns = width > 768 ? 3 : 1; // Basic tablet adaptation
-
+```tsx
+export function DocumentGrid({ items }: { items: any[] }) {
   return (
-    <FlatList
-      key={numColumns} // Force component rebuild on layout change
-      numColumns={numColumns}
-      data={data}
-      renderItem={renderItem}
-    />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+      {items.map(item => (
+        <Card key={item.id} title={item.title} description={item.status} />
+      ))}
+    </div>
   );
 }
 ```
@@ -161,30 +157,27 @@ export function GridList() {
 
 # Anti-Patterns
 
-❌ **Hardcoded Colors**: Styling using strings like `color: '#0284C7'` outside the stylesheet configuration or tailwind token map. This breaks dark mode styling.
+❌ **Hardcoded Top/Bottom Margins**: Using static margins like `mt-12` for headers, which leaves headers under the status bar on notched devices, or too low on bezel-based displays. Use `.safe-top`.
 
-❌ **Font Weight and Family Disconnect**: Assigning bold families (`font-bold`) without loading the matching font weight in Expo, causing layout breaks on Android.
-
-❌ **Pixel-perfect Assumptions**: Designing screens for one specific device type (e.g. iPhone 15 Pro) without testing text wrap on smaller devices.
+❌ **Fixed Pixels Sizing**: Assigning absolute width values (e.g. `w-[375px]`) that break UI consistency on smaller Android devices or when rendering on larger tablets.
 
 ---
 
 # Production Checklist
 
-- [ ] All primary and secondary themes look clean in both Light and Dark modes.
-- [ ] Font assets are pre-loaded in the root layout file.
-- [ ] Adaptive components fit on small screen sizes.
-- [ ] Interactive buttons have defined visual press states.
-- [ ] Contrast ratios meet WCAG 2.2 AA standard.
+- [ ] Header layouts and navigation drawers respect device top notches.
+- [ ] UI colors and contrast ratios pass accessibility checks in both modes.
+- [ ] Viewport height is dynamic (`dvh`) to avoid footer cutoff when virtual keyboards show.
+- [ ] All clickable items have hover and active press styles.
 
 ---
 
 # Success Criteria
 
 The Design System is successful when:
-- Adding support for Dark Mode requires no additional code other than prefixing classes with `dark:`.
-- Color updates can be applied universally by editing `tailwind.config.js`.
-- Custom primitives align perfectly on both iOS and Android.
+- Layout and component UI codebase are 100% shared between web console and mobile platforms.
+- Supporting dark mode only requires applying standard `dark:` class utilities.
+- Safe Area offsets render perfectly on all emulator models tested.
 
 ---
 

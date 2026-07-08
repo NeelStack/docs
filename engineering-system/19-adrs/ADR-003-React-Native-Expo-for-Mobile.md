@@ -1,7 +1,7 @@
 ---
 document_id: ADR-003
 title: React Native + Expo for Mobile Development
-status: Accepted
+status: Superseded by ADR-007
 date: 2026-07-04
 deciders: CTO, Chief Architect, Mobile Lead
 consulted: Mobile Engineering Team
@@ -12,7 +12,7 @@ informed: All Engineering
 
 ## Status
 
-**Accepted** — In effect as of 2026-07-04
+**Superseded** — Superseded by [ADR-007 — Capacitor over React Native](file:///d:/poc/docs/engineering-system/19-adrs/ADR-007-Capacitor-over-React-Native.md) on 2026-07-04.
 
 ## Context
 

@@ -1,7 +1,7 @@
 ---
 document_id: NES-416
 title: Mobile Reference Architecture
-subtitle: Enterprise Mobile Directory Layout, Shared Code & Reference Architecture
+subtitle: Enterprise Mobile Directory Layout & Shared Code Architecture
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -20,9 +20,9 @@ next_document: NES-500 Platform Engineering Standards
 
 # Executive Summary
 
-To scale mobile applications across multiple development teams and maintain an enterprise-grade codebase, we must enforce a structured, consistent directory layout.
+To scale mobile development and maintain an enterprise-grade codebase, we enforce a structured directory layout.
 
-This document establishes the official **NeelStack Mobile Reference Architecture** blueprint, outlining module boundaries, utility paths, configuration standards, and code-sharing constraints.
+This standard establishes the official **NeelStack Capacitor Reference Architecture**, defining module boundaries, service configurations, and monorepo code sharing constraints.
 
 ---
 
@@ -30,113 +30,100 @@ This document establishes the official **NeelStack Mobile Reference Architecture
 
 This standard defines:
 
-- Directory Layout Blueprint
-- Module Responsibility Boundaries
-- Dependency Rules
-- Code Sharing Conventions (Web vs. Mobile)
-- Reference Architecture Checklist
+- Directory Layout Blueprint for Vite + Capacitor
+- Module responsibility boundaries
+- Code sharing standards in Monorepos
 
 ---
 
 # Directory Layout Blueprint
 
-All mobile codebases must align with the following directory structure:
+All mobile client applications must align with the following structural layout:
 
 ```text
 /
-├── app/                      # Expo Router File-Based Navigation
-│   ├── _layout.tsx           # Global Providers and Layout Configuration
-│   ├── index.tsx             # Entry Point (Splash Screen or Redirects)
-│   ├── (auth)/               # Authentication Route Group
-│   └── (app)/                # Authenticated Application Screens
+├── android/                  # Android Studio native platform project
+├── ios/                      # Xcode native platform project
+├── public/                   # Static public assets (icons, splash)
+├── src/                      # Single Page Application source code
+│   ├── components/           # Reusable UI component wrappers
+│   │   ├── ui/               # Shared primitives (buttons, modals)
+│   │   └── common/           # Shared views (headers, tabs layout)
+│   │
+│   ├── features/             # Feature modules
+│   │   └── document/         # Document feature scope
+│   │       ├── components/   # Feature-specific UI
+│   │       ├── hooks/        # Feature queries (TanStack hooks)
+│   │       ├── store/        # Feature store (Zustand client store)
+│   │       └── services/     # Feature HTTP requests
+│   │
+│   ├── routes/               # Navigation routing configurations
+│   │   └── index.ts          # React Router v7 routes map
+│   │
+│   ├── services/             # Global native bridges and services
+│   │   ├── api.ts            # Network client setup
+│   │   ├── secureStore.ts    # Secure Storage wrapper
+│   │   └── telemetry.ts      # Analytics tracker
+│   │
+│   ├── styles/               # CSS inputs
+│   │   └── index.css         # Tailwind directives and safe-area utilities
+│   │
+│   ├── main.tsx              # App initialization entry point
+│   └── App.tsx               # Root component wrapping router providers
 │
-├── src/                      # Source Code Container
-│   ├── components/           # UI Elements
-│   │   ├── ui/               # Reusable UI Primitives (Button, Input, Card)
-│   │   └── common/           # Shared Common Components (Header, Loader)
-│   │
-│   ├── features/             # Feature-Driven Modules
-│   │   ├── document/         # Document Feature Domain
-│   │   │   ├── components/   # Feature-Specific UI
-│   │   │   ├── hooks/        # Feature Hooks (e.g. useDocumentQuery)
-│   │   │   ├── store/        # Feature Client Store (e.g. useDocStore)
-│   │   │   └── services/     # Feature API Communications
-│   │   └── profile/          # Profile Feature Domain
-│   │
-│   ├── services/             # Global Platform Services
-│   │   ├── api.ts            # Network client configuration
-│   │   ├── secureStore.ts    # Secure Storage Interface
-│   │   └── telemetry.ts      # Global Event Logging
-│   │
-│   ├── styles/               # Global Styles and Style Tokens
-│   │   └── global.css        # NativeWind Stylesheet Import
-│   │
-│   └── utils/                # Pure helper functions
-│
-├── assets/                   # Static Resources (Fonts, Images, Icons)
-├── plugins/                  # Local Expo Config Plugins
-├── tailwind.config.js        # NativeWind configuration
-├── app.json                  # Static Expo Configuration
-├── app.config.ts             # Dynamic Expo Configuration
-└── eas.json                  # EAS Build/Submit profiles
+├── capacitor.config.ts       # Capacitor bridge config
+├── vite.config.ts            # Vite compiler configuration
+├── package.json              # App dependency declaration
+└── tailwind.config.js        # Tailwind CSS config
 ```
 
 ---
 
 # Module Responsibility Boundaries
 
-To maintain clean architecture boundaries:
-
-- **Screens (`/app`)**: Keep layouts thin. They must focus strictly on routing, parameter parsing, and wrapping UI views in layout structure. Avoid declaring API calls directly inside screen components.
-- **Features (`src/features`)**: Group components, hooks, stores, and types by feature domains. Features must not import components or hooks directly from other features (shared logic must reside in `src/components/ui` or `src/services`).
-- **Services (`src/services`)**: Define connections to external systems (HTTP request client, push managers, telemetry, secure local storage).
+- **Routes (`src/routes`)**: Focus strictly on path configurations and layouts. Do not place business calculations or direct API call functions inside path declarations.
+- **Features (`src/features`)**: Group code by feature domains. Features must not import files directly from other features (shared logic must reside in global components or services).
+- **Services (`src/services`)**: Enforce standard integrations with native plugins and custom API instances.
 
 ---
 
-# Code Sharing (Web vs. Mobile)
+# Code Sharing (Web Console vs. Mobile Client)
 
-When sharing code within a monorepo setup (NES-102) between our Next.js frontend and React Native mobile applications:
+In a monorepo workspace (NES-102), because both our Next.js admin console and our Capacitor mobile client compile to standard HTML5 / React, we can share extensive sections of the UI code:
 
-- **Shareable**: Domain types (TypeScript interfaces), API payload schemas, validation schemas (Zod), helper functions (`utils`), and translation dictionaries.
-- **Not Shareable**: UI components, navigation logic, and styling. The web uses HTML/Next.js tags while mobile uses React Native native layouts (views, texts). Trying to combine these into single multi-platform UI files introduces high maintenance costs and compromises quality.
-
----
-
-# Architecture Verification Rules
-
-We verify code patterns automatically using custom ESLint rules to prevent architectural drift:
-
-- **Constraint 1**: `src/components/ui` must not import anything from `src/features` (prevents circular dependencies).
-- **Constraint 2**: Features must communicate with external APIs via `src/services/api` configuration (standardizes request headers, tokens, and telemetry).
+- **Highly Shareable**:
+  - **Types**: Type definitions and payload validation (Zod schemas).
+  - **Business Logic**: Hooks, helpers, utility modules, and Zustand client store parameters.
+  - **UI Styling**: Tailwind CSS theme tokens.
+  - **Component Primitives**: Unstyled logic components, form components, or standard buttons/cards that use standard Tailwind styling tags.
+- **Not Shareable**:
+  - **Navigation**: Next.js uses server-optimized file routing, while the mobile client uses SPA client routing (`react-router-dom`).
+  - **Native Features**: Plugins referencing specific device libraries (e.g. camera, biometrics) must be wrapped in platform checks if used in files shared with Next.js web applications.
 
 ---
 
 # Anti-Patterns
 
-❌ **Direct Native Calls in Components**: Importing native components directly into screens. Wrap them in clean interfaces under `src/components/ui` to support cross-platform stubbing during tests.
+❌ **Importing React Native styles**: Copying code with React Native stylesheet elements (`StyleSheet.create`) or React Native tags (`View`, `Text`), which will crash the Vite build.
 
-❌ **Monolithic Files**: Creating files containing database setup, API controllers, helper calculations, and UI styling in a single screen module.
-
-❌ **Loose App configurations**: Pushing raw credentials, keys, or passwords straight into `app.json`. Use environment variables dynamically injected via `app.config.ts`.
+❌ **Direct Native Calls inside Shared Elements**: Placing Capacitor plugins directly inside components shared with the Next.js web project without checks, causing crashes when running in web browsers.
 
 ---
 
 # Production Checklist
 
-- [ ] Directory layout matches the Mobile Reference Architecture blueprint.
-- [ ] No file exceeds the maximum line size limitations (NES-400).
-- [ ] Shared configurations (eslint, tailwind) match monorepo requirements.
-- [ ] Code sharing boundaries are validated.
-- [ ] Documentation updated.
+- [ ] Directory layout conforms to the Vite + Capacitor blueprint.
+- [ ] Shared components do not import platform-specific dependencies without fallback checks.
+- [ ] Tailwind configurations mirror the monorepo design system parameters.
 
 ---
 
 # Success Criteria
 
 The Reference Architecture is successful when:
-- Developers can locate any component, hook, or API client interface instantly based on the directory layout.
-- The project compiles cleanly from scratch without circular import failures.
-- Changes to shared types or API schemas propagate automatically across both web and mobile workspaces.
+- Shared components render identically on both Next.js console pages and Capacitor WebView emulators.
+- The project builds cleanly with zero circular dependencies or package conflicts.
+- Codebase reuse across mobile web views and web consoles exceeds 80%.
 
 ---
 

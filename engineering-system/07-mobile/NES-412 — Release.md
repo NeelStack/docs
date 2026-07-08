@@ -1,7 +1,7 @@
 ---
 document_id: NES-412
 title: Release
-subtitle: Enterprise EAS Submit, App Store Deployment & OTA Updates Standard
+subtitle: Enterprise Native Building, Fastlane & Live Updates Standard
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,15 @@ next_document: NES-413 Analytics
 
 # NES-412 — Release
 
-> **"App stores require predictable deployment pipelines. We automate store delivery, manage code signing securely, and control OTA updates dynamically."**
+> **"App stores require predictable deployment pipelines. We automate native building, manage signing certificates securely, and deploy web updates instantly using Live Updates."**
 
 ---
 
 # Executive Summary
 
-Mobile releases require deployment to the Apple App Store and Google Play Store.
+Mobile releases require publishing compiled native binaries (`.ipa` for iOS, `.aab` for Android) to Apple TestFlight and the Google Play Console.
 
-Manual compilation, code signing profile generation, and build uploads from developer workstations are insecure, slow, and prone to errors.
-
-This standard defines the deployment workflow, EAS Submit automation, OTA (Over-The-Air) update policies, and code signing credential security.
+We automate binary compiling using **Fastlane** and deploy JavaScript/CSS layout hotfixes instantly using **Capawesome Capacitor Live Update** to bypass store reviews for minor updates.
 
 ---
 
@@ -32,133 +30,119 @@ This standard defines the deployment workflow, EAS Submit automation, OTA (Over-
 
 This standard defines:
 
-- Versioning Scheme (Semantic Versioning + Build Numbers)
-- Multi-Environment Builds (Dev, Staging, Prod)
-- EAS Submit Automated Store Delivery
-- CodePush and Expo Updates (OTA Policy)
-- Build Credential Security (App Store Connect / Play Console APIs)
+- Semantic Versioning and native build increments
+- Compiling native workspaces using Fastlane
+- Live Updates (OTA updates) deployment rules
+- Secure signing credential storage
 
 ---
 
-# Semantic Versioning & Build Numbers
+# Versioning Standards
 
-All mobile releases must follow a strict versioning scheme:
+All Capacitor applications must synchronize version declarations between the web configuration and native workspaces:
 
-- **Marketing Version (`version` in `app.json`)**: SemVer structure (`Major.Minor.Patch` e.g. `1.2.0`). This version is visible to customers in stores.
-- **Build Number (`ios.buildNumber` / `android.versionCode`)**: Monotonically increasing integers (e.g. `24`). This number is internal and must increment on every build upload.
-
-```json
-{
-  "expo": {
-    "version": "1.0.0",
-    "ios": {
-      "buildNumber": "1"
-    },
-    "android": {
-      "versionCode": 1
-    }
-  }
-}
-```
+- **Marketing Version (SemVer)**: Configured in `package.json` and mirrored to iOS `CFBundleShortVersionString` and Android `versionName` (e.g. `1.2.0`).
+- **Build Number**: Monotonically increasing integers mapped to iOS `CFBundleVersion` and Android `versionCode` (e.g. `45`).
 
 ---
 
-# Deployment Pipeline
+# Release and Build Automation (Fastlane)
 
-We utilize **EAS Submit** to automate the delivery of built packages (`.ipa` for iOS, `.aab` for Android) to App Store Connect TestFlight and Google Play Console Internal Track.
+We enforce the use of **Fastlane** inside native directories (`/ios/fastlane` and `/android/fastlane`) to sign, build, and deploy packages to app store test tracks.
 
 ```text
-  Developer Commits Code
-            │
-            ▼
-    CI/CD Tests Run
-            │
-            ▼
-   EAS Build Pipeline
-            │
-      ┌─────┴─────┐
-      ▼           ▼
-  Build iOS   Build Android
-    (.ipa)       (.aab)
-      │           │
-      └─────┬─────┘
-            ▼
-  EAS Submit Auto-Upload
-      ┌─────┴─────┐
-      ▼           ▼
-  TestFlight   Google Play
+    Developer Commits Code
+              │
+              ▼
+    Vite Web Compiles (dist)
+              │
+              ▼
+   npx cap sync (sync to wrapper)
+              │
+              ▼
+     Fastlane Lane Invoked
+        ┌─────┴─────┐
+        ▼           ▼
+   Fastlane iOS  Fastlane Android
+    (Match certificates) (Decrypt keystore)
+        │           │
+        ▼           ▼
+    Xcode Build   Gradle Build
+      (.ipa)       (.aab)
+        │           │
+        └─────┬─────┘
+              ▼
+    TestFlight / Google Play Pushes
+```
+
+### Fastlane iOS Lane Example:
+```ruby
+desc "Submit build to TestFlight"
+lane :beta do
+  setup_ci
+  match(type: "appstore") # Fetch certificate profiles from secure git vault
+  increment_build_number(build_number: ENV["GITHUB_RUN_NUMBER"])
+  gym(scheme: "App") # Compile .ipa
+  pilot # Upload to TestFlight
+end
 ```
 
 ---
 
-# CodePush & Over-The-Air (OTA) Updates
+# Live Updates (Over-The-Air)
 
-We use **Expo Updates** for OTA deployment to fix critical bugs or update content without requiring full store review.
+We use **`@capawesome/capacitor-live-update`** (or approved alternatives) to push JS/CSS bundle patches to devices without requiring a full App Store review.
 
-### OTA Guidelines:
+### Live Update Guidelines:
+- **Allowed Updates**: Bug fixes, style adjustments, text/content edits.
+- **Prohibited Updates**: Native package modifications (adding Capacitor plugins), significant structural flow changes. Any changes containing native code additions require compiling a new native binary.
 
-- **Allowed Changes**: Styling fixes, wording changes, minor JS logic fixes.
-- **Prohibited Changes**: Native module configuration updates, major dependencies changes, core navigation shifts. Any native-level modification requires a full store build submission.
-- **Channel Routing**: Updates are directed via runtime channels (`development`, `staging`, `production`) configured in `eas.json`.
+```typescript
+import { LiveUpdate } from '@capawesome/capacitor-live-update';
 
-```json
-{
-  "updates": {
-    "url": "https://u.expo.dev/xxxx-xxxx-xxxx"
-  },
-  "runtimeVersion": {
-    "policy": "appVersion"
+export async function checkApplicationUpdates() {
+  const result = await LiveUpdate.sync();
+  if (result.activeBundleChanged) {
+    // Prompt user to reload or reload automatically
+    await LiveUpdate.reload();
   }
 }
 ```
 
 ---
 
-# Build Credential Security
+# Build Credentials Security
 
-We do not store code-signing keystores, provisioning profiles, or production passwords on developer machines or public repositories.
+Keystore certificates, iOS `.p8` distribution files, and signing keys must never be committed to the application repository.
 
-- **EAS Credentials**: Configure EAS to securely hold Apple distribution certificates and Google Play keystores in its encrypted vault.
-- **Service Accounts**: Generate Google Play API service keys and Apple App Store API keys to authorize automated EAS submissions without manual login steps.
-
----
-
-# Environments & Release Channels
-
-We compile separate app configurations for each deployment stage to keep test data isolated:
-
-- **Development**: Connects to localhost APIs or developer sandboxes. Builds are configured as `development` profiles.
-- **Staging**: Connects to `https://api.staging.neelstack.com`. Shared via TestFlight Internal or Google Play Internal Sharing.
-- **Production**: Connects to `https://api.neelstack.com`. Published to public stores.
+- **Fastlane Match**: iOS certificates are encrypted and stored in a private repository managed by the core infrastructure team.
+- **CI Environments**: Store keystores and API authentication tokens inside GitHub Actions Encrypted Secrets, decrypting them dynamically during CI runs.
 
 ---
 
 # Anti-Patterns
 
-❌ **Manual Build Uploads**: Building and archiving `.ipa` or `.apk` files inside Xcode or Android Studio on local machines to upload via Transporter or browser.
+❌ **Manual Xcode Archive Submissions**: Creating release archives locally in Xcode or Android Studio on developer laptops, which leads to inconsistent compilation setups.
 
-❌ **Pushing Native Updates via OTA**: Pushing javascript updates that rely on a new native package dependency via Expo Updates, causing immediate app crashes on customer devices.
-
-❌ **Using Same Bundle ID**: Using `com.neelstack.portal` for dev, staging, and prod builds. Use suffixes: `com.neelstack.portal.dev` and `com.neelstack.portal.staging`.
+❌ **Deploying Native Plugins via Live Update**: Pushing web code containing new native plugins to devices running older binaries, triggering app crashes on user launch.
 
 ---
 
 # Production Checklist
 
-- [ ] Version and build numbers have been incremented.
-- [ ] Staging tests are validated and approved by QA.
-- [ ] Keystores and Apple certificates are active and unexpired.
-- [ ] Privacy policies, terms of service links, and store assets are updated.
-- [ ] Release notes are localized and formatted.
+- [ ] Web production assets build completes cleanly before `npx cap sync`.
+- [ ] iOS profiles are verified via Fastlane Match.
+- [ ] Android signing keystore is decrypted successfully on CI.
+- [ ] Version and build numbers are incremented.
 
 ---
 
 # Success Criteria
 
 The Release pipeline is successful when:
-- App store builds are triggered, compiled, and uploaded to store internal tracks in a single step from GitHub Actions.
-- OTA updates deploy to production users in less than 5 minutes for urgent bug patches.
-- Non-technical release managers can promote TestFlight builds to production via store dashboards without developer intervention.
+- Releases can be built and pushed to TestFlight and Google Play via a single GitHub Actions commit push.
+- Live updates deploy to production environments within 5 minutes.
+- Android and iOS packages build cleanly without developer signing setups.
 
 ---
 

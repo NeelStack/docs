@@ -84,7 +84,7 @@ A **Golden Path** is the recommended, fully automated pathway for shipping softw
 
 - Python FastAPI microservices (NES-201)
 - Next.js web applications (NES-302)
-- React Native mobile apps (NES-400)
+- Capacitor mobile apps (NES-400)
 - AI agent models (NES-219)
 
 ### Platform Template Standard:

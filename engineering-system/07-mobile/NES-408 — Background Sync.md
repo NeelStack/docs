@@ -1,7 +1,7 @@
 ---
 document_id: NES-408
 title: Background Sync
-subtitle: Enterprise Background Tasks, TaskManager & Batch Sync Standard
+subtitle: Enterprise Background Tasks & Batch Sync Standard
 version: 1.0.0
 status: Draft
 classification: Internal
@@ -14,17 +14,17 @@ next_document: NES-409 Storage
 
 # NES-408 — Background Sync
 
-> **"Silent background processes optimize user readiness. We execute light, power-efficient sync tasks using Expo TaskManager and BackgroundFetch."**
+> **"Silent background processes optimize user readiness. We execute light, power-efficient sync tasks using Capacitor native background wrappers."**
 
 ---
 
 # Executive Summary
 
-Mobile operating systems enforce strict energy budgets and background limits.
+Mobile operating systems enforce strict resource limits, battery budgets, and termination policies on background executions.
 
-Processes that attempt to execute long-running downloads, complex calculations, or network requests in the background will be terminated by the OS, and persistent violations will cause the OS to limit the application's launch priority.
+Processes that attempt to execute prolonged network queries or heavy computing while backgrounded will be terminated by the OS.
 
-This standard defines the execution limits, scheduling options, and implementation rules for background sync using **Expo TaskManager** and **BackgroundFetch**.
+This standard establishes the background execution boundaries and defines how to run background synchronization in Capacitor using the **Capacitor Background Runner** (or native background task APIs).
 
 ---
 
@@ -32,109 +32,106 @@ This standard defines the execution limits, scheduling options, and implementati
 
 This standard defines:
 
-- Background Execution Rules (iOS/Android constraints)
-- Task Registration via Expo TaskManager
-- Periodic Scheduling with Expo BackgroundFetch
-- Power Management and Batch Optimization
-- Error Handling and OS Termination handling
+- Background Execution limits (iOS vs. Android constraints)
+- Task configuration using `@capacitor/background-runner`
+- Power and network optimization policies
+- Error recovery and termination handles
 
 ---
 
 # OS-Specific Background Constraints
 
-We design background tasks to respect iOS and Android differences:
+We design background tasks to align with OS policies:
 
-- **iOS (Background Fetch)**: The OS determines task execution frequency based on user usage patterns, network connectivity, and battery state. Tasks are strictly capped at **30 seconds** of execution.
-- **Android (WorkManager)**: Enforces a minimum execution interval of **15 minutes** for periodic tasks. Tasks run in a native background thread.
+- **iOS (Background Tasks)**: The OS allocates background running slots based on battery status, network state, and usage patterns. Single runs are strictly capped at **30 seconds** of execution before termination.
+- **Android (WorkManager)**: Periodic jobs require a minimum repetition interval of **15 minutes**. Tasks execute in a headless service thread.
 
 ---
 
-# Task Manager Registration
+# Task Configuration (Capacitor Background Runner)
 
-All background tasks must be defined and registered in the global scope (outside the React component cycle), usually in `index.js` or before app mount.
+We utilize `@capacitor/background-runner` to run tasks in an isolated context using Javascript/TypeScript scripts compiled natively.
 
-- **Standard**: Use `expo-task-manager` to register named tasks.
+- **Setup**: Define background jobs in `src/background/tasks.ts`:
 
 ```typescript
-import * as TaskManager from 'expo-task-manager';
-import * as BackgroundFetch from 'expo-background-fetch';
+import { BackgroundRunner } from '@capacitor/background-runner';
 
-const BACKGROUND_SYNC_TASK = 'background-sync-task';
+// Register background execution task
+export async function registerBackgroundSyncTask() {
+  await BackgroundRunner.register({
+    label: 'com.neelstack.background.sync',
+    src: 'background/sync.js', // Compiled JS task script
+    event: 'syncData',
+    interval: 15, // Run every 15 minutes (Android min limit)
+    repeats: true,
+  });
+}
+```
 
-// Define the task
-TaskManager.defineTask(BACKGROUND_SYNC_TASK, async () => {
+- **Task Script (`sync.js`)**: Keep script files lightweight. Import only basic network clients and storage utilities:
+
+```javascript
+// background/sync.js
+addEventListener('syncData', async (resolve, reject, args) => {
   try {
-    const hasUpdates = await performSilentSync();
-    return hasUpdates 
-      ? BackgroundFetch.BackgroundFetchResult.NewData 
-      : BackgroundFetch.BackgroundFetchResult.NoData;
+    // Perform light database write / fetch
+    const response = await fetch('https://api.neelstack.com/sync/silent');
+    const data = await response.json();
+    
+    // Process sync local writes...
+    resolve(data);
   } catch (error) {
-    return BackgroundFetch.BackgroundFetchResult.Failed;
+    reject(error);
   }
 });
 ```
 
 ---
 
-# Task Scheduling
+# Power & Network Optimization Rules
 
-Schedule the registered background task contextually.
+Background runner tasks must avoid draining user resources:
+
+1. **Verify Connection**: Check if the network is on Wi-Fi before initiating large media downloads or logs uploads.
+2. **Buffer and Batch**: Group multiple small requests into a single payload to minimize radio wakeups.
+3. **Timeout Handlers**: Enforce a strict timeout (e.g. 25 seconds) on all network fetches inside the runner script.
 
 ```typescript
-import * as BackgroundFetch from 'expo-background-fetch';
-
-export async function registerBackgroundFetchAsync() {
-  const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_SYNC_TASK);
-  if (!isRegistered) {
-    throw new Error('Task must be defined in global scope first');
-  }
-
-  return BackgroundFetch.registerTaskAsync(BACKGROUND_SYNC_TASK, {
-    minimumInterval: 60 * 15, // 15 minutes (minimum allowed on Android)
-    stopOnTerminate: false,    // Continue running if user kills app
-    startOnBoot: true,        // Restart task on device reboot
-  });
+// Timeout fetch wrapper
+export function fetchWithTimeout(url: string, options: RequestInit, delay = 20000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), delay);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(id));
 }
 ```
 
 ---
 
-# Power & Data Optimizations
-
-Background processes must be designed to conserve battery and cellular data limits.
-
-- **Check Connection**: Verify if the user is connected to Wi-Fi before initiating large file sync tasks.
-- **Batch Processing**: Group multiple network updates into a single payload to minimize radio wakeups.
-- **Clean Execution**: Avoid importing large UI dependencies inside background tasks. Keep task bundles focused strictly on API communication and local database write routines.
-
----
-
 # Anti-Patterns
 
-❌ **Long-running Task Requests**: Executing API calls that take more than 10-15 seconds in background fetch hooks. This leads to immediate task termination by the OS.
+❌ **Importing React/UI Modules in Runner Scripts**: Attempting to reference UI libraries or global stores (Zustand, React context) from a background thread. Background scripts run inside a headless worker container separate from the main web application DOM.
 
-❌ **Dynamic State Updates inside Tasks**: Trying to update React component states (e.g. setting Zustand or React context) from a background task executing in a headless thread.
-
-❌ **Over-scheduling Tasks**: Setting small execution intervals (e.g., trying to run tasks every 1 minute), which will be blocked or delayed by the OS system managers.
+❌ **Forcing Short Sync Loops**: Scheduling tasks to execute every 1-2 minutes. The operating system will flag the app for CPU hogging and restrict its startup priority.
 
 ---
 
 # Production Checklist
 
-- [ ] Background tasks are registered at the global entry point of the app.
-- [ ] Task return values correctly map to `BackgroundFetchResult` values.
-- [ ] Tasks have a timeout wrapper (e.g., abort request if it takes longer than 25 seconds).
-- [ ] Entitlements for background modes (fetch) are declared in `app.config.js` under the `ios` node.
-- [ ] Logging is configured to output diagnostics to local databases for later crash reporting verification.
+- [ ] Background runner scripts are packaged as standalone files in the static assets path.
+- [ ] Task scripts terminate and invoke resolve/reject within the 25-second limit.
+- [ ] iOS Background Modes (Background Fetch) is enabled in Xcode Capabilities.
+- [ ] Diagnostic logs are written to SQLite databases to verify task completions.
 
 ---
 
 # Success Criteria
 
-The Background Sync design is successful when:
-- Silent updates run when the device is locked, pre-populating user caches.
-- Battery usage diagnostics show the app consuming less than 2% of overall device daily consumption.
-- Background tasks fail gracefully and resume on the next OS schedule slot.
+The Background Sync implementation is successful when:
+- Silent updates run when the device is locked, syncing offline queues to the cloud.
+- Mobile OS battery reports show background executions consuming less than 2% of daily power.
+- Task execution failures are recovered gracefully on subsequent intervals.
 
 ---
 
