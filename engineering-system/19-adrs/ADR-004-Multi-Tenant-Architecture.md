@@ -1,55 +1,23 @@
 ---
-document_id: ADR-004
-title: Multi-Tenant SaaS Architecture with Row-Level Security
-status: Accepted
-date: 2026-07-04
-deciders: CTO, Chief Architect, Backend Lead
-consulted: Security Team, Data Team
-informed: All Engineering
+ADR-004: Schema-per-Tenant as Default Tenancy Isolation
+Status: Accepted
+Date: 2026-07-06
+
+Context:
+DhruvaOS serves diverse educational customers ranging from small local schools to regional school chains and national government systems. The isolation model must balance strict data segregation security mandates (assuring that schools cannot query other schools' data) with high resource efficiency and minimal database operational cost. Running database-per-tenant clusters for every small pilot tenant creates massive memory/connection socket overhead, while pure shared-table pool models increase noisy-neighbor risk and schema migration friction.
+
+Decision:
+We chose Postgres schema-per-tenant (`schema_isolated` mode) using dynamic search_path connection pooling as our default multi-tenancy isolation tier, with escalation triggers to database-per-tenant and dedicated clusters for high-compliance workloads.
+
+Alternatives Considered:
+- Shared Pool Table with RLS: Rejected because schema migrations affect all tenants simultaneously, preventing database customization per school, and noisy-neighbor query starvation is high.
+- Database-per-tenant by Default: Rejected because it wastes database connection sockets, requires dynamic provisioning of Postgres instances for small pilot schools, and increases cold-start latency.
+- Completely Siloed VM-per-Tenant: Rejected due to the extreme operational cost of compute overhead for small-scale educational institutions.
+
+Consequences:
+We commit to schema-based routing where connections are bound dynamically using `SET LOCAL search_path = tenant_slug`. We accept the tradeoff that PgBouncer transaction pooling limits must be carefully managed to prevent noisy-neighbor pool starvation.
+
+Revisit Triggers:
+- If Postgres schema management count on a single database instance exceeds 10,000 schemas, causing system catalog table access delays.
+- If data compliance mandates require physical storage filesystem isolation for a specific tenant.
 ---
-
-# ADR-004 — Multi-Tenant SaaS Architecture
-
-## Status
-
-**Accepted** — In effect as of 2026-07-04
-
-## Context
-
-NeelStack products serve multiple organizations (schools, enterprises, government departments) from a single platform. The architecture must ensure complete data isolation between tenants while minimizing operational overhead.
-
-Three tenancy models were considered:
-1. **Silo**: Separate database per tenant
-2. **Bridge**: Separate schema per tenant, shared database
-3. **Pool**: Shared tables with `tenant_id` column isolation
-
-## Decision
-
-**We will use the Pool model (shared tables) with PostgreSQL Row-Level Security (RLS)** as the primary multi-tenancy strategy.
-
-The `tenant_id` column is present in every tenant-scoped table. PostgreSQL RLS policies enforce that every query is scoped to the current tenant session.
-
-## Consequences
-
-### Positive
-- Simple operational model — one database cluster to manage
-- PostgreSQL RLS enforces isolation at the database engine level (not application level)
-- Easy to add new tenants (no database provisioning required)
-- Cross-tenant analytics possible by bypassing RLS at the data warehouse layer
-
-### Negative
-- Noisy neighbor risk — one tenant's heavy queries affect others (mitigated by connection pooling and query limits)
-- Schema migrations affect all tenants simultaneously
-- Very large tenants may require eventual migration to dedicated databases
-
-## Mitigation
-
-- Connection pooling via PgBouncer prevents connection exhaustion
-- Resource quotas per tenant implemented at application layer
-- Tenant isolation verified by automated integration tests on every PR
-
-## Related Standards
-
-- NES-205 — Multi-Tenancy Architecture
-- NES-207 — PostgreSQL Standards (RLS section)
-- NES-204 — Authorization (RBAC & Permissions)

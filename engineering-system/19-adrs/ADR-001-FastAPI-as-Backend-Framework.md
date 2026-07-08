@@ -1,63 +1,23 @@
 ---
-document_id: ADR-001
-title: FastAPI as Primary Backend Framework
-status: Accepted
-date: 2026-07-04
-deciders: CTO, Chief Architect, Backend Lead
-consulted: Backend Engineering Team
-informed: All Engineering
-supersedes: N/A
+ADR-001: FastAPI as Primary Backend Framework
+Status: Accepted
+Date: 2026-07-06
+
+Context:
+NeelStack requires a high-performance web framework for the DhruvaOS backend to serve AI-native microservices and concurrent database operations under a small platform engineering team. We need native async/await capabilities to prevent thread blocking during long-running LLM API calls, alongside automatic documentation generation to support dynamic plugin client bindings. The framework must utilize Python due to existing developer skills and machine learning integrations.
+
+Decision:
+We chose FastAPI as our primary backend framework for core API and AI Gateway services.
+
+Alternatives Considered:
+- Django / DRF: Rejected due to its synchronous-first design which creates connection starvation when orchestrating concurrent async AI requests, and its heavy monolithic database models overhead.
+- Flask: Rejected because it lacks built-in async routing support, data validation schemas (Pydantic), and auto-generated OpenAPI, requiring too many third-party packages to maintain.
+- Node.js (Express/NestJS): Rejected because it separates the web service runtime from our primary Python-based machine learning libraries, necessitating complex IPC/gRPC layers for AI features.
+
+Consequences:
+FastAPI commits us to utilizing SQLAlchemy/Pydantic for database and validation patterns rather than an integrated ORM. We accept the tradeoff of having to manually orchestrate code layouts and service configurations due to FastAPI's unopinionated micro-framework structure.
+
+Revisit Triggers:
+- If microservice count scales past 50 and API compilation times/auto-docs generation bottleneck container startup performance.
+- If node/rust backend technologies develop native, high-performance direct bindings to our core ML pipelines.
 ---
-
-# ADR-001 — FastAPI as Primary Backend Framework
-
-## Status
-
-**Accepted** — In effect as of 2026-07-04
-
-## Context
-
-NeelStack requires a Python backend framework that supports:
-- High-concurrency async I/O for AI workloads
-- Auto-generated OpenAPI documentation
-- Strong type safety with Pydantic
-- Fast development velocity
-- Native async support for database and HTTP clients
-
-Candidates evaluated:
-1. **FastAPI** — Async-native, Pydantic v2, auto OpenAPI
-2. **Django REST Framework** — Mature, sync-first (async support added later)
-3. **Flask** — Lightweight, but requires many extensions for production use
-4. **Litestar** — FastAPI alternative, newer
-
-## Decision
-
-**We will use FastAPI** as the primary backend framework for all NeelStack services.
-
-## Consequences
-
-### Positive
-- Native `async/await` throughout the stack enables high-concurrency AI features
-- Pydantic v2 provides strict type validation at the API boundary
-- Automatic OpenAPI generation reduces documentation burden
-- Strong Python ecosystem compatibility (LangChain, SQLAlchemy, Celery)
-- Developer productivity: clear dependency injection system
-
-### Negative
-- Smaller ecosystem vs Django for admin interfaces (use separate admin service)
-- Less opinionated than Django — requires more architectural discipline
-- Django ORM not available (mitigated by SQLAlchemy)
-
-## Alternatives Considered
-
-| Alternative | Rejected Reason |
-|---|---|
-| Django REST Framework | Sync-first design creates blocking issues for AI workloads |
-| Flask | Too minimal — every production feature must be added manually |
-| Litestar | Excellent but smaller community, less ecosystem maturity |
-
-## Related Standards
-
-- NES-201 — FastAPI Architecture
-- TECH-004 — FastAPI Standard
-- NES-200 — Python Engineering Standards

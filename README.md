@@ -42,7 +42,6 @@ docs/
 │   └── appendix/                              # Acronyms, Index, Bibliography, References
 │
 └── product-docs/                              # Product-specific documentation
-    ├── eduos/                                 # EduOS documentation
     ├── toolvines/                             # Toolvines documentation
     ├── dhruvaos/                              # DhruvaOS documentation
     ├── naukarimitra/                          # NaukariMitra documentation

@@ -25,7 +25,7 @@ NeelStack uses a **multi-repo strategy with monorepo patterns within each produc
 |---|---|
 | `NeelStack/docs` | Engineering standards and documentation |
 | `NeelStack/platform` | Shared infrastructure, Kubernetes configs, Terraform |
-| `NeelStack/eduos` | EduOS product (frontend + backend) |
+| `NeelStack/neelstack-foundation` | DhruvaOS core foundation product (frontend + backend monorepo) |
 | `NeelStack/toolvines` | Toolvines product |
 | `NeelStack/dhruvaos` | DhruvaOS product |
 | `NeelStack/shared-libs` | Shared Python/TypeScript libraries |

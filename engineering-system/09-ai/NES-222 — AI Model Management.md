@@ -26,6 +26,15 @@ Applications never directly integrate with AI providers.
 
 Instead, they consume models through the AI Platform.
 
+---
+
+# Model Tier Capabilities & Constraints
+
+> [!WARNING]
+> **Self-Hosted Tier Model Constraints**: The default self-hosted model configured is `llama3.2:3b` which is a **text-only** model. Self-hosted deployments do NOT support audio roster transcription or visual test sheet grading unless a vision-capable model (e.g. `llama3.2-vision`) is manually downloaded and configured on local servers. Attempting multimodal operations with a text-only model will trigger explicit `[OLLAMA MULTIMODAL EXCEPTION]` exceptions at startup or runtime.
+
+---
+
 The AI Platform provides
 
 - Multi-LLM Routing

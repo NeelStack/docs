@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.0] — 2026-07-06
+
+### Changed
+- Updated system architecture and PRD documentation to reflect the removal of legacy Node.js/Express `sockets` and `jobs` services.
+- Updated `NES-101-System-Architecture.md`, `NES-111-Multi-Tenant-Deployment-Strategy.md`, `NES-112-Module-and-Feature-Configuration-System.md`, `pricing-strategy.md`, and `PRD-002-Parent-Portal.md` to reference native FastAPI WebSockets and Scheduler instead of Socket.io and Node.js-based services.
+
+### Added
+- Created `NES-231 — AI Development Guide.md` under `09-ai/` specifying backend AI microservice architectures, directory layout trees, orchestrator intent routing rules, custom module creation, and pgvector database integrations.
+
 ## [2.0.0] — 2026-07-04
 
 ### Added — Phase 15 (Diagrams & Reference Implementations)
