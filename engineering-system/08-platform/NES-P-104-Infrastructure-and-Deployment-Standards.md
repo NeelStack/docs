@@ -52,12 +52,14 @@ DhruvaOS standardizes a structured delivery pipeline composed of five environmen
 - **Testing / UAT / Prod**: Configured using production-grade orchestration config maps or secure container injection variables. Never uses hardcoded defaults.
 
 ### 2.2 Infrastructure Mapping
+
 | Capability | Dev Environment | Prod Environment |
 | --- | --- | --- |
 | **Database** | Single Docker PG instance with pgvector | Clustered Managed DB (Aurora PG / Azure SQL) with read replicas |
 | **Object Storage** | Local MinIO storage container | AWS S3 / Google Cloud Storage with CDN caching |
 | **SSO / Identity** | Local Zitadel Docker container | Clustered Enterprise Zitadel Identity Provider |
 | **Message Broker** | Single-node local NATS JetStream container | Clustered, high-availability NATS JetStream nodes |
+
 ### 2.3 Environment Flexibility & Extension (e.g., adding Staging / UAT)
 The architecture is designed to be environment-agnostic. While only two primary environments (`dev` and `prod`) are operated by default, adding a third or fourth environment (e.g., `staging`, `testing`, `uat`) requires **zero application code changes**:
 1. **Pydantic Configs**: Application settings are completely defined via environment variables.
