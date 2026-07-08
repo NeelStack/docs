@@ -43,19 +43,19 @@ E2E tests verify the full lifecycle against containerized infrastructure and ass
 
 ## 3. Outstanding Gaps & Deferred Items
 
-1.  **RLS Context Propagation in Background Jobs (Gated Gap)**:
-    *   *Reference*: [scheduler.py](file:///d:/poc/neelstack-foundation/services/core/src/app/core/scheduler.py#L149-160)
-    *   *Details*: System cleanups run under non-owner connection roles and lack tenant context propagation. As a result, the RLS policies filter out all rows, causing background deletion jobs to delete 0 records.
-    *   *Deferred Action*: A `# TODO(NES-120)` warning comment has been added to flag this for future container runtime or credential updates.
-2.  **Single-Key Static Encryption**:
-    *   *Details*: Cryptography keys are static and lack dynamic rotation mechanisms.
-    *   *Deferred Action*: Key rotation and KMS integrations are scheduled for a future platform security iteration.
+1. **RLS Context Propagation in Background Jobs (Gated Gap)**:
+   * *Reference*: [scheduler.py](file:///d:/poc/neelstack-foundation/services/core/src/app/core/scheduler.py#L149-160)
+   * *Details*: System cleanups run under non-owner connection roles and lack tenant context propagation. As a result, the RLS policies filter out all rows, causing background deletion jobs to delete 0 records.
+   * *Deferred Action*: A `# TODO(NES-120)` warning comment has been added to flag this for future container runtime or credential updates.
+2. **Single-Key Static Encryption**:
+   * *Details*: Cryptography keys are static and lack dynamic rotation mechanisms.
+   * *Deferred Action*: Key rotation and KMS integrations are scheduled for a future platform security iteration.
 
 ---
 
 ## 4. Final Go/No-Go Milestone Status
 
-*   **Completion Rate**: **100% of Verified-Safe Modules** are fully documented and covered by frontend test suites.
-*   **Overall Platform Go/No-Go**: **GO (With Caveats)**
-    *   All customer-facing web/mobile portal flows and REST API endpoints are fully verified, authenticated, and isolated. 
-    *   Background database cleanup jobs are gated under a `VERIFIED-GAP` and should not be certified as production-ready until tenant iteration context is resolved.
+* **Completion Rate**: **100% of Verified-Safe Modules** are fully documented and covered by frontend test suites.
+* **Overall Platform Go/No-Go**: **GO (With Caveats)**
+  * All customer-facing web/mobile portal flows and REST API endpoints are fully verified, authenticated, and isolated. 
+  * Background database cleanup jobs are gated under a `VERIFIED-GAP` and should not be certified as production-ready until tenant iteration context is resolved.
