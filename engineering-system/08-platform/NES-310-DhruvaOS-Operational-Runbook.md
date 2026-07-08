@@ -1,3 +1,11 @@
+---
+document_id: NES-310
+title: DhruvaOS Operational Runbook
+version: 1.0.0
+status: Approved
+owner: Platform Engineering Team
+---
+
 # DhruvaOS Operational Runbook (NES-310)
 
 This runbook defines the **operationally-tunable parameters, cluster configuration thresholds, and step-by-step manual procedures** for the DhruvaOS platform.
