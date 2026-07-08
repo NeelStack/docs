@@ -30,6 +30,7 @@ Feature: Razorpay Online Fee Collection
 - **Accounts Module**: Updates transaction logs in the `account_transaction` table.
 - **Notification Engine**: Dispatches receipts, payment alerts, and due reminders.
 - **Auditing**: Records transactional status shifts in `audit_log`.
+- **Automated Invoice Scheduler**: Receives triggers from the Admissions module to automatically initialize and seed pending billing schedules (e.g. Admission and Tuition fees) for enrolled students.
 
 ## 5. Success Metrics
 - **Digital Collections**: Target > 90% of fee payments processed online.

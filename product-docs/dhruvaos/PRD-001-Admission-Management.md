@@ -33,6 +33,10 @@ Feature: Online Admission Application
 - **Student Module**: Creates standard `Student` row upon application approval.
 - **Notification Engine**: Dispatches emails via SMTP on status changes.
 - **Authorization**: Keycloak OIDC authentication is required for Admin API endpoints.
+- **AI Verification Service**: Integrates with the AI Gateway service to scan and check submitted identity documents via OCR summaries.
+- **Seat Capacity Guard**: Validates that active students do not exceed the target `School` total seats limit before enrollment completion.
+- **Automated Class Allocation**: Queries and assigns students to the lowest available `Class` rank (e.g., Grade 1 default).
+- **Billing Schedule Integration**: Triggers automated generation of enrollment and tuition invoice structures inside the accounts system.
 
 ## 5. Success Metrics
 - **Online Conversion**: Target > 80% of admission applications completed online.
