@@ -902,6 +902,22 @@ Before production
 
 ---
 
+# Section 10: Dynamic Prompt A/B Testing
+
+To support progressive rollout and live quality analysis of new prompt templates:
+- **Hash-Bucket Routing**: Implemented deterministic traffic splitting by hashing session IDs (using MD5) into bucket percentages.
+- **Auditable Rollouts**: Changes in feature flags and prompt traffic allocations write auditable historical timeline logs into the database (`ai_timeline`), enabling easy rollbacks.
+
+---
+
+# Section 11: Continuous Model & Provider Benchmarking
+
+To ensure high availability and prevent vendor lock-in or regional API outages:
+- **Automated Score Execution**: Monthly benchmark evaluations check response health and latency across multiple LLM providers.
+- **Provider Status Routing**: The performance outcomes automatically toggle provider statuses (`ONLINE` vs. `DOWN`), allowing the runtime query router to failover to local or alternative model deployments (e.g. local Ollama backups during external provider failures).
+
+---
+
 # Success Criteria
 
 AI Evaluation is successful when

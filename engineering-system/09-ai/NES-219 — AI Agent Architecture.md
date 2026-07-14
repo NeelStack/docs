@@ -812,6 +812,24 @@ Before production
 
 ---
 
+# Section 11: Dynamic Plugin SDK & Registry
+
+To support extensible ecosystem integrations without modifying the core AI gateway, NeelStack establishes a unified Plugin SDK framework:
+- **Registration Decorators**: `@ai_tool` and `@ai_capability` allow developers to expose python functions and capabilities directly to the runtime registry dynamically.
+- **Strict Manifest Validation**: Schema constraints are validated via Pydantic model configurations (`manifest.json` validation schema) preventing unauthorized tool access or insecure argument mapping.
+- **PostgreSQL Plugin Storage**: Мaps active/inactive states of loaded plugins in the database, offering administrative activate/deactivate API endpoints.
+- **Client SDK Facade**: Applications integrate using `ai.workflow` and `ai.agent` facade triggers to execute backend plugins seamlessly.
+
+---
+
+# Section 12: Multi-Agent Consensus Orchestration
+
+For high-sensitivity notifications or decision tasks (e.g., student behavioral reports, principal metrics alerts), NeelStack implements a multi-agent review layer:
+- **ConsensusOrchestrator**: Executes concurrent sub-agent analyses (e.g. Academic Agent review and Behavioral/Discipline Agent review).
+- **Consolidation Voting**: Compiles responses, checks policies, and performs a tone and safety validation. It resolves conflict or consensus scoring before outputting final results or escalating for human approval.
+
+---
+
 # Success Criteria
 
 AI Agent Architecture is successful when

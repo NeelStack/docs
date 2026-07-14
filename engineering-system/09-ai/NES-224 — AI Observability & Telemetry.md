@@ -808,6 +808,21 @@ Before production
 
 ---
 
+# Section 11: OpenTelemetry Tracing Span Architecture
+
+To capture structured telemetry and timing logs across the execution of workflows, agents, and tools:
+- **`@trace_span` Decorator**: Automatically wraps async or sync agent tools and internal execution steps, propagating trace parent IDs.
+- **Timing and Exception Logs Fallback**: If OpenTelemetry trace brokers are temporarily unavailable, execution timings are logged locally as fallbacks to ensure trace audits are never lost.
+
+---
+
+# Section 12: Streaming RAG SSE Citations
+
+To provide instant, transparent visibility into the grounding context of RAG retrievals:
+- **Citation Streaming**: The RAG router streams citations alongside token generations. It yields a structured `citations` array packet in the initial Server-Sent Events (SSE) frame, allowing the parent-portal client to render sources immediately while the generation streams.
+
+---
+
 # Success Criteria
 
 AI Observability is successful when

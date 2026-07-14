@@ -1077,6 +1077,22 @@ Version 2.0 will include
 
 ---
 
+# Section 11: Distributed Redlock Concurrency Guard
+
+To prevent race conditions, tool double-invocation, and model token quota leaks during concurrent requests:
+- **RedlockManager**: Uses a Redis-backed Redlock algorithm executing atomic Lua scripts for secure lock release.
+- **Leak Prevention Lifecycle**: The execution runtime wraps tool executions in a try/finally pattern, guaranteeing lock release even if upstream validations or policy checks fail.
+
+---
+
+# Section 12: RBAC Policy Engine Interceptors
+
+To maintain zero-trust access boundaries across tool execution boundaries:
+- **Policy Engine Interceptors**: Performs pre-input prompt injection sanitization, post-response PII pattern redactions, and dynamic tool-level RBAC checks by extracting platform context authentication headers.
+- **Fail-Safe Fallbacks**: Under circuit-breaker failures, fallback configurations route queries to regional offline instances, maintaining high availability without breaching access permissions.
+
+---
+
 # AI Security & Safety Checklist
 
 - [x] AI Security Architecture Defined
