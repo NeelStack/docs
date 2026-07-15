@@ -44,6 +44,7 @@ docs/
 └── product-docs/                              # Product-specific documentation
     ├── toolvines/                             # Toolvines documentation
     ├── dhruvaos/                              # DhruvaOS documentation
+    │   └── README.md                          # [DhruvaOS Architecture & Features Overview](file:///d:/NeelStack/docs/product-docs/dhruvaos/README.md)
     ├── naukarimitra/                          # NaukariMitra documentation
     ├── sarkarimitra/                          # SarkariMitra documentation
     └── shared-platform/                       # Shared platform documentation
