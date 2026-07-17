@@ -4,7 +4,16 @@ All notable changes to the NeelStack documentation repository are documented in 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
----
+## [2.2.0] — 2026-07-18
+
+### Added
+- Created `catalogues.py` specifying dynamic industry configurations for `education` and `pharma` modules.
+- Created `pharma` core database models and scaffolding configurations under `app.platform.models` and `app.modules.pharma`.
+- Documented multi-industry catalogues onboarding and dynamic seeder structures inside `NES-P-108` and product architecture guides.
+
+### Changed
+- Updated system architecture to run as a multi-industry SaaS operating platform.
+- Refactored tenant models, routes, and provisioning dependencies to decouple from hardcoded Education-specific schemas (e.g. RLS verification on `tenant` table instead of `student`).
 
 ## [2.1.0] — 2026-07-06
 

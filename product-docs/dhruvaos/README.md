@@ -1,6 +1,6 @@
 # DhruvaOS — System Architecture & Features Overview
 
-DhruvaOS is a next-generation, AI-first, multi-tenant Education Operating System (EdOS) designed to replace fragmented ERPs, LMS platforms, and standalone communication tools with a single unified, secure, and globally scalable platform.
+DhruvaOS is a next-generation, AI-first, multi-tenant Enterprise Operating System Platform designed to host and scale reusable multi-industry SaaS modules (such as Education, Pharma, Retail, Hospital, CRM, HRMS, Accounting, etc.) under a single unified, secure, and globally scalable platform.
 
 ---
 
@@ -60,9 +60,10 @@ graph TD
     LicensingService --> Razorpay[Razorpay API]
 ```
 
-### 1. Multi-Tenant Context Routing
+### 1. Multi-Tenant Context Routing & Multi-Industry Catalogues
 DhruvaOS operates on a flexible multi-tenant layout supporting:
-*   **SaaS Tier (Schema-per-tenant)**: Tenant isolation is achieved dynamically via a custom database middleware. The system intercepts incoming requests, resolves the tenant from the host headers or JWT claims, and executes a dynamic schema routing instruction: `SET search_path TO tenant_[slug]`.
+*   **Multi-Industry Catalogues**: Onboarding processes accept an `industry` parameter (e.g. `education` or `pharma`) resolving default branding metadata and module suites dynamically from the [catalogues registry](file:///d:/NeelStack/neelstack-foundation/services/core/src/app/platform/api/admin/catalogues.py).
+*   **SaaS Tier (Schema-per-tenant)**: Tenant isolation is achieved dynamically via a custom database middleware. The system intercepts incoming requests, resolves the tenant context from the host headers or JWT claims, and routes database operations to the tenant's isolated schema using Postgres policies or schema-isolated search paths.
 *   **Compliance & Enterprise Tiers**: Support for logical database isolation (database-per-tenant) and dedicated postgres compute instances based on corporate SLAs.
 *   **Platform Kernel**: Thread-safe `TenantContext` using Python's native `ContextVar` to secure context boundaries across concurrent asynchronous task loops.
 
@@ -131,6 +132,7 @@ All core modules are organized as isolated features under [services/core/src/app
 18. **Sync**: Handles database backup configurations, cloud replication tasks, and external legacy DB integrations.
 19. **Transportation**: Tracks buses, route coordinates, driver assignments, and vehicle maintenance logs.
 20. **WebSocket**: Runs WebSocket connections for real-time dashboard notifications.
+21. **Pharma**: Manages medicines inventory, batch details, and expiry tracking for pharmaceutical environments.
 
 ---
 

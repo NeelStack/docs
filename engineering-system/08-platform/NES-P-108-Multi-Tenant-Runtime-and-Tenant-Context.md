@@ -88,3 +88,13 @@ When SQL database commands execute, the database pool dynamically routes traffic
        # execute logic
    ```
 3. **Audit Context Failures**: Any request that fails to resolve a valid tenant schema must immediately return a `400 Bad Request (Missing Tenant Context)` header, logging the exception to Loki telemetry.
+
+---
+
+# 6. Multi-Industry Tenant Provisioning & Catalogues
+
+To support multiple vertical industries (e.g., Education, Pharma) on the same platform core, the runtime isolates onboarding configurations:
+
+1. **Industry Column**: The `Tenant` table declares an `industry` string column to store the tenant's primary business vertical.
+2. **Dynamic Seeder Catalogues**: During signup onboarding, settings and module mappings are resolved dynamically from `INDUSTRY_CATALOGUES` inside [catalogues.py](file:///d:/NeelStack/neelstack-foundation/services/core/src/app/platform/api/admin/catalogues.py).
+3. **Zero-Code Module Registration**: When new industry modules are created, they declare their router and nav menus inside their local `module.yaml`, which are scanned at startup without modifying core files.
